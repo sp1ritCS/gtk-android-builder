@@ -1,0 +1,14 @@
+diff --git a/gtk/meson.build b/gtk/meson.build
+index b3b02bdd88..07795c1bee 100644
+--- a/gtk/meson.build
++++ b/gtk/meson.build
+@@ -1098,7 +1098,7 @@ gtk_settings_schemas = [
+   'org.gtk.gtk4.Settings.EmojiChooser.gschema.xml',
+   'org.gtk.gtk4.Settings.Debug.gschema.xml',
+ ]
+-install_data(gtk_settings_schemas, install_dir: gtk_schemasdir)
++install_data(gtk_settings_schemas, install_dir: gtk_schemasdir, install_tag: 'runtime')
+ gnome.compile_schemas(depend_files: files(gtk_settings_schemas), build_by_default: true)
+ gtk_schema_build_dir = meson.current_build_dir()
+ 
+

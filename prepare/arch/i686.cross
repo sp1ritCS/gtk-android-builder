@@ -1,0 +1,8 @@
+[constants]
+arch = 'i686'
+abi = 'x86'
+
+[host_machine]
+cpu_family = 'x86'
+cpu = 'i686'
+endian = 'little'

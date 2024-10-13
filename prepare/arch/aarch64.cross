@@ -1,0 +1,8 @@
+[constants]
+arch = 'aarch64'
+abi = 'arm64-v8a'
+
+[host_machine]
+cpu_family = 'aarch64'
+cpu = 'aarch64'
+endian = 'little'

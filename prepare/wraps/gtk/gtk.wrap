@@ -1,0 +1,7 @@
+[wrap-git]
+url = https://gitlab.gnome.org/sp1rit/gtk.git
+revision = android
+depth = 1
+
+[provide]
+dependency_names = gtk4

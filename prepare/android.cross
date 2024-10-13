@@ -1,0 +1,62 @@
+[constants]
+common_flags = []
+
+[binaries]
+c          = toolchain / 'bin' / arch+'-linux-android31-clang'
+cpp        = toolchain / 'bin' / arch+'-linux-android31-clang++'
+ar         = toolchain / 'bin/llvm-ar'
+as         = toolchain / 'bin/llvm-as'
+ranlib     = toolchain / 'bin/llvm-ranlib'
+ld         = toolchain / 'bin/ld'
+strip      = toolchain / 'bin/llvm-strip'
+pkg-config = '/usr/bin/pkg-config'
+
+[built-in options]
+c_args = common_flags
+c_link_args = common_flags + ['-Wl,--build-id=sha1']
+cpp_args = c_args
+cpp_link_args = c_link_args
+
+prefix = '/'
+bindir = 'bin' / abi
+libdir = 'lib' / abi
+
+[properties]
+sys_root = toolchain / 'sysroot/'
+pkg_config_libdir = '@DIRNAME@/and-cfg/'
+
+[host_machine]
+system = 'android'
+
+[glib:built-in options]
+default_library = 'shared'
+
+[glib:project options]
+tests = false
+
+[cairo:project options]
+tests = 'disabled'
+
+[harfbuzz:project options]
+tests = 'disabled'
+introspection = 'disabled'
+docs = 'disabled'
+utilities = 'disabled'
+
+[gtk:project options]
+android-backend = true
+introspection = 'disabled'
+build-demos = false
+build-testsuite = false
+build-examples = false
+build-tests = false
+
+[libadwaita:built-in options]
+default_library = 'shared'
+
+[libadwaita:project options]
+introspection = 'disabled'
+vapi = false
+gtk_doc = false
+tests = false
+examples = false

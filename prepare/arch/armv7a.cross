@@ -1,0 +1,8 @@
+[constants]
+arch = 'armv7a'
+abi = 'armeabi-v7a'
+
+[host_machine]
+cpu_family = 'arm'
+cpu = 'armv7'
+endian = 'little'

@@ -1,0 +1,531 @@
+#!/usr/bin/perl
+
+# Pixiewood - GTK Android Builder
+# Copyright (C) 2024  Florian "sp1rit" <sp1rit@disroot.org>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+use strict;
+use warnings;
+use Archive::Tar;
+use File::Basename qw(fileparse);
+use File::Copy qw(copy);
+use File::Path qw(make_path);
+use File::Spec::Functions qw(catfile rel2abs);
+use Getopt::Long qw(GetOptions);
+use Glib;
+use IPC::Run qw(run);
+use JSON;
+use List::Util qw(max);
+use POSIX ":sys_wait_h";
+use Set::Scalar;
+use XML::LibXML;
+use XML::LibXSLT;
+
+my $version = "0";
+my $pixiewood_dirname = ".pixiewood";
+my (undef, $asset_dir) = fileparse(rel2abs(__FILE__)); # TODO: readlink
+
+my $meson = "meson";
+my $ninja = "ninja";
+
+my $studio_dir = "/opt/android-studio/";
+my $sdk;
+my $toolchain; # TODO: automatically determine good toolchain
+
+my $dir = ".";
+my $verbose = 0;
+
+my $help = 0;
+my $cversion = 0;
+
+sub usage {
+	my ($error) = @_;
+	print STDERR "Error: $error\n" if $error;
+
+	print << "EOF";
+Usage: $0 [options] <action> <pixiewood manifest>
+
+Options:
+  -a, --android-studio-dir <DIR>  Location where Android Studio is installed
+  -s, --sdk <DIR>                 Install location of the Android SDK
+  -t, --toolchain <DIR>           Install location of the Android NDK (typically within the SDK)
+  --meson <EXECUTABLE>            Specify the executable for the meson buildsystem
+  --ninja <EXECUTABLE             Specify the executable for the ninja buildsystem
+  -C, --change-dir <DIR>          The project source root of the project to build
+  -v, --verbose                   Enable verbose output
+  --help                          Display this help message
+  -V, --version                   Display version and debug information
+
+Actions:
+  prepare                         Prepare the project for building with GTK Android. This includes
+                                  patching the subprojects and configuring the build directories.
+  generate                        Generate an Android application skeleton based on the manifest.
+  build                           Build the project and wrap it into and Android package.
+EOF
+	exit 1 if $error;
+	exit 0;
+}
+
+sub do_version {
+	print << "EOF";
+Pixiewood (version $version)
+Copyright (c) 2024  Florian "sp1rit" <sp1rit\@disroot.org>
+
+Licensed under the GNU General Public License version 3 or later.
+  You should have received a copy of it along with this program.
+  If not, see <https://www.gnu.org/licenses/>.
+
+This is free software: you are free to change and redistribute it.
+This program comes with ABSOLUTELY NO WARRANTY, to the extent permitted by law.
+EOF
+	exit 0;
+}
+
+GetOptions(
+	"android-studio-dir|a=s" => \$studio_dir,
+	"sdk|s=s" => \$sdk,
+	"toolchain|t=s" => \$toolchain,
+	"meson=s" => \$meson,
+	"ninja=s" => \$ninja,
+	"change-dir|C=s" => \$dir,
+	"verbose|v" => \$verbose,
+	"help" => \$help,
+	"version" => \$cversion,
+) or usage("Incorrect usage of command line options");
+
+usage() if $help;
+do_version() if $cversion;
+
+my $action = shift @ARGV;
+usage("Action not specified") unless defined $action;
+
+my $app_path = shift @ARGV;
+usage("Manifest not specified") unless defined $app_path;
+usage("Android SDK directory not specified") unless defined $sdk;
+usage("Android NDK (Toolchain) directory not specified") unless defined $toolchain;
+
+my $app_doc = XML::LibXML->load_xml(location => $app_path, expand_entities => 1);
+
+my $appx = XML::LibXML::XPathContext->new($app_doc);
+$appx->registerNs("pw", "https://sp1rit.arpa/pixiewood/");
+$appx->registerNs("meta", "https://specifications.freedesktop.org/metainfo/1.0");
+
+my $pixiewood_dir = catfile($dir, $pixiewood_dirname);
+make_path($pixiewood_dir);
+chdir $dir or die("Failed to enter source directory: $!");
+
+my $arches = Set::Scalar->new("aarch64", "armv7a", "i686", "x86_64");
+my $architectures = $appx->findnodes("/pw:app/pw:build/pw:architectures")->shift;
+if (defined $architectures) {
+	my @listed = map { $_->textContent } $appx->findnodes("pw:arch", $architectures);
+	my $listed_arches = Set::Scalar->new(@listed);
+	
+	my $archtype = $architectures->getAttribute("mode");
+	if (not defined $archtype or $archtype eq "whitelist") {
+		$arches = $arches->intersection($listed_arches);
+	} elsif ($archtype eq "blacklist") {
+		$arches = $arches->difference($listed_arches);
+	} else {
+		die("Unknown architectures modes: $archtype");
+	}
+}
+die "Can't build for no architectures" if $arches->size == 0;
+
+{
+	package ParallelRunner;
+
+	sub new {
+		my ($class) = @_;
+		my $self = {
+			pids => [],
+		};
+		bless $self, $class;
+		return $self;
+	}
+
+	sub launch {
+		my ($self, @cmd) = @_;
+		
+		my $pid = fork;
+		die "fork failed: $!" if not defined $pid;
+
+		if ($pid == 0) {
+			#open(STDOUT, '>', '/dev/null') or die $!;
+			#open(STDERR, '>', '/dev/null') or die $!;
+
+			exec @cmd or die "exec failed: $!";
+		} else {
+			push @{$self->{pids}}, $pid;
+		}
+	}
+
+	sub wait {
+		my ($self) = @_;
+
+		while (scalar @{$self->{pids}} > 0) {
+			my $child = waitpid(-1, 0);
+			my $status = $?;
+			die "Unexpected child process $child died" unless (grep { $_ == $child } @{$self->{pids}});
+
+			if ($status != 0) {
+				foreach my $pid (@{$self->{pids}}) {
+					kill QUIT => $pid;
+				}
+				return 0;
+			}
+			@{$self->{pids}} = grep { !/$child/ } @{$self->{pids}};
+		}
+
+		1;
+	}
+}
+
+my %actions = (
+	"prepare" => sub {
+		print "Generating toolchain crossfile\n" if $verbose;
+		my $tcc = Glib::KeyFile->new;
+		$tcc->set_string("constants", "toolchain", "'$toolchain/toolchains/llvm/prebuilt/linux-x86_64/'");
+		open my $tccfh, ">", "$pixiewood_dirname/toolchain.cross" or die("Failed to open toolchain crossfile for writing");
+		print $tccfh $tcc->to_data;
+		close $tccfh;
+
+		print "Patching dependencies\n" if $verbose;
+		my @dependencies = $appx->findnodes("//pw:app/pw:dependencies/pw:*");
+		foreach my $dependency (@dependencies) {
+			make_path "subprojects";
+
+			my $depname = $dependency->localname;
+			my $wrap = Glib::KeyFile->new;
+			$wrap->set_list_separator(ord(','));
+			$wrap->load_from_file("$asset_dir/prepare/wraps/$depname/$depname.wrap", "keep-comments");
+
+			my $revision = $dependency->getAttribute("revision");
+			if (defined $revision) {
+				my @valid_for_revision = qw(wrap-git wrap-hg wrap-svn);
+				foreach my $section (@valid_for_revision) {
+					$wrap->set_string($section, "revision", $revision) if $wrap->has_group($section);
+				}
+			}
+
+			my @patches = map { $_->textContent } $appx->findnodes("pw:patch", $dependency);
+			if (scalar @patches > 0) {
+				foreach my $patch (@patches) {
+					make_path "subprojects/packagefiles/$depname/";
+					copy("$asset_dir/prepare/wraps/$depname/$patch.patch", "subprojects/packagefiles/$depname/") or die("Failed to copy $depname patch $patch: $!");
+				}
+
+				my @valid_for_diff = qw(wrap-file wrap-git wrap-hg wrap-svn);
+				foreach my $section (@valid_for_diff) {
+					$wrap->set_string($section, "diff_files", join(',', map { "$depname/$_.patch" } @patches)) if $wrap->has_group($section);
+				}
+			}
+
+
+			open my $wrapfh, ">", "subprojects/$depname.wrap" or die("Failed to open wrapfile $depname for writing");
+			print $wrapfh $wrap->to_data;
+			close $wrapfh;
+		}
+
+		print "Configuring build directories\n" if $verbose;
+		my $configures = ParallelRunner->new;
+		my @options = map { $_->textContent } $appx->findnodes('//pw:app/pw:build/pw:configure-options/pw:option');
+		while (defined(my $arch = $arches->each)) {
+			my @cmd = ($meson, "setup",
+			           "--cross-file", "$pixiewood_dirname/toolchain.cross",
+			           "--cross-file", "$asset_dir/prepare/arch/$arch.cross",
+			           "--cross-file", "$asset_dir/prepare/android.cross",
+			           @options,
+			          "$pixiewood_dirname/bin-$arch", ".");
+			$configures->launch(@cmd);
+		}
+		die "Configuration failed, see logs for more info" unless $configures->wait();
+	},
+	"generate" => sub {
+		my $id = $appx->findvalue("/pw:app/pw:metainfo/meta:component/meta:id[not(\@xml:lang)]");
+		die("Unable to find component id in manifest") unless $id;
+		my @id_parts = split /\./, $id;
+		my $package = lc(join('/', @id_parts));
+		my $class = $id_parts[-1] . "App";
+
+		my @targets = do {
+			my $arch = $arches->each;
+			$arches->size; # reset the iterator
+			my $file = "$pixiewood_dirname/bin-$arch/meson-info/intro-targets.json";
+			open(my $fh, "<", $file) or die("Failed to open target introspection $file: $!");
+			local $/;
+			my $json = decode_json <$fh>;
+			close $fh;
+			grep { defined $_->{android_usecase} and $_->{android_usecase} eq 'application' } @$json
+		};
+		my $target = $appx->findvalue('//pw:app/pw:build/@target');
+		@targets = grep { $_->{name} eq $target } @targets if $target;
+		# TODO: heuristic (case insensitive .name contains $name)
+		die "Unable to find target, have you set android_usecase?" if scalar @targets == 0;
+		die "Found more than one target, please set /pw:app/pw:build/\@target" if scalar @targets > 1;
+		my $libname = $targets[0]->{name};
+
+		our $output_dir = catfile($pixiewood_dirname, "android");
+
+		my $skeleton = Archive::Tar->new;
+		$skeleton->setcwd($output_dir);
+		$skeleton->read("$asset_dir/generate/skel.tar");
+		$skeleton->extract();
+
+		sub create_handle {
+			my ($dest) = @_;
+			my (undef, $dirs) = fileparse($dest);
+	
+			make_path(catfile($output_dir, $dirs));
+			my $path = catfile($output_dir, $dest);
+			open (my $fh, '>', $path) or die("Unable to create/open file $path for writing: $!");
+			return $fh;
+		}
+
+		my @stylesheets = (
+			("settings.xsl", "settings.gradle"),
+			("gradle.xsl", "app/build.gradle"),
+			("manifest.xsl", "app/src/main/AndroidManifest.xml"),
+			("strings.xsl", "app/src/main/res/values/strings.xml"),
+			("application.xsl", catfile("app/src/main/java/", $package, "$class.java"))
+		);
+
+		my $xslt = XML::LibXSLT->new();
+		for my ($stylesheet_file, $dest) (@stylesheets) {
+			my $style_doc = XML::LibXML->load_xml(location => catfile("$asset_dir/generate", $stylesheet_file), no_cdata => 1);
+			my $stylesheet = $xslt->parse_stylesheet($style_doc);
+			my $results = $stylesheet->transform($app_doc, XML::LibXSLT::xpath_to_string(libname => "$libname"));
+
+			my $fh = create_handle $dest;
+			$stylesheet->output_fh($results, $fh);
+			close $fh;
+		}
+
+		print "Generating translations\n" if $verbose;
+		do {
+			my $lang_doc = XML::LibXML->load_xml(location => catfile("$asset_dir/generate", "langs.xsl"), no_cdata => 1);
+			my $langsheet = $xslt->parse_stylesheet($lang_doc);
+			my $langres = $langsheet->transform($app_doc);
+			my $langs = $langsheet->output_as_chars($langres);
+
+			my $strings_doc = XML::LibXML->load_xml(location => catfile("$asset_dir/generate", "strings.xsl"), no_cdata => 1);
+			my $stringssheet = $xslt->parse_stylesheet($strings_doc);
+
+			open my $fh, '<', \$langs or die "Could not open string: $!";
+			while (my $lang = <$fh>) {
+				chomp $lang;
+				my $results = $stringssheet->transform($app_doc, XML::LibXSLT::xpath_to_string(lang => "$lang"));
+
+				my $ofh = create_handle "app/src/main/res/values-$lang/strings.xml";
+				$stringssheet->output_fh($results, $ofh);
+				close $ofh;
+			}
+			close $fh;
+		};
+
+		my $styledef = $appx->findnodes("/pw:app/pw:style")->shift or die("Missing style definition");
+		# TODO: implement
+		#print "Generating style\n" if $verbose;
+
+		print "Generating application icon\n" if $verbose;
+		do {
+			my $icondef = $appx->findnodes("pw:icon", $styledef)->shift or return;
+			my $kind = $icondef->getAttribute("type") or die("Unspecified icon type");
+			if ($kind eq "generate") {
+				sub handle_drawable {
+					my ($drawable, $dest) = @_;
+					my $type = $drawable->getAttribute("type") or die("Missing type definition from drawable");
+
+					my $output = create_handle($dest);
+
+					if ($type eq "avd") {
+						my $path = $drawable->getAttribute("path") or die("Drawable is missing path");
+						open (my $fh, '<', $path);
+						while (my $line = <$fh>) {
+							print $output $line;
+						}
+						close $fh;
+					} elsif ($type eq "svg") {
+						$ENV{'STUDIO_DIR'} = $studio_dir;
+						my $path = $drawable->getAttribute("path") or die("Drawable is missing path");
+						my @cmd = (catfile("$asset_dir/generate", "Svg2Avd"), $path);
+
+						my $scale = $drawable->getAttribute("scale");
+						if (defined $scale) {
+							run \@cmd, '>', \my $converted or die('Svg2Avd failed');
+							my $doc = XML::LibXML->load_xml(string => $converted, no_blanks => 1);
+							my $vector = $doc->documentElement();
+							
+							my $transform = $doc->createElement("group");
+							my $width = $vector->getAttribute("android:viewportWidth");
+							my $height = $vector->getAttribute("android:viewportHeight");
+							my $xoff = ($width *(1-$scale)) / 2.0;
+							my $yoff = ($height*(1-$scale)) / 2.0;
+							$transform->setAttribute("android:scaleX", $scale+0);
+							$transform->setAttribute("android:scaleY", $scale+0);
+							$transform->setAttribute("android:translateX", $xoff);
+							$transform->setAttribute("android:translateY", $yoff);
+
+							foreach my $node ($vector->childNodes) {
+								$transform->appendChild($node);
+							}
+							$vector->appendChild($transform);
+							$doc->toFH($output, 1);
+						} else {
+							run \@cmd, '>', $output or die('Svg2Avd failed');
+						}
+					} else {
+						die("Unsupported drawable type: $type");
+					}
+
+					close $output;
+				}
+				sub handle_color {
+					my ($color, $dest, $name) = @_;
+
+					my $doc = XML::LibXML->createDocument("1.0", "utf-8");
+
+					my $resources = $doc->createElement("resources");
+					my $entry = $doc->createElement("color");
+					$entry->setAttribute("name", $name);
+					my $color_entry = $doc->createTextNode($color->textContent);
+					$entry->addChild($color_entry);
+					$resources->addChild($entry);
+					$doc->setDocumentElement($resources);
+
+					my $output = create_handle($dest);
+					$doc->toFH($output, 1);
+					close $output;
+				}
+
+				my $fg = $appx->findnodes("pw:*[\@target='foreground']", $icondef)->shift or die("Missing foreground from icon");
+				my $bg = $appx->findnodes("pw:*[\@target='background']", $icondef)->shift or die("Missing background from icon");
+				my $mono = $appx->findnodes("pw:*[\@target='monochrome']", $icondef)->shift;
+
+				if ($fg->localname eq "drawable") {
+					handle_drawable($fg, "app/src/main/res/drawable/ic_launcher_foreground.xml");
+				} else {
+					die("Unsupported node for foreground: " . $fg->nodeName);
+				}
+
+				if ($bg->localname eq "drawable") {
+					handle_drawable($bg, "app/src/main/res/drawable/ic_launcher_background.xml");
+				} elsif ($bg->localname eq "color") {
+					handle_color($bg, "app/src/main/res/values/ic_launcher_background.xml", "ic_launcher_background");
+				} else {
+					die("Unsupported node for foreground: " . $fg->nodeName);
+				}
+
+				if (defined $mono) {
+					if ($mono->localname eq "drawable") {
+						handle_drawable($mono, "app/src/main/res/drawable/ic_launcher_monochrome.xml");
+					} else {
+						die("Unsupported node for monochrome: " . $mono->nodeName);
+					}
+				}
+
+
+				my $icondoc = XML::LibXML->createDocument("1.0", "utf-8");
+
+				my $icon = $icondoc->createElement("adaptive-icon");
+				$icon->setNamespace("http://schemas.android.com/apk/res/android", "android", 0);
+				my $background = $icondoc->createElement("background");
+				$background->setAttribute("android:drawable", "\@" . $bg->localname . "/ic_launcher_background");
+				my $foreground = $icondoc->createElement("foreground");
+				$foreground->setAttribute("android:drawable", "\@" . $fg->localname . "/ic_launcher_foreground");
+				$icon->addChild($background);
+				$icon->addChild($foreground);
+				if (defined $mono) {
+					my $monochrome = $icondoc->createElement("monochrome");
+					$monochrome->setAttribute("android:drawable", "\@" . $fg->localname . "/ic_launcher_monochrome");
+					$icon->addChild($monochrome);
+				}
+				$icondoc->setDocumentElement($icon);
+
+				my $output = create_handle("app/src/main/res/mipmap-anydpi/ic_launcher.xml");
+				$icondoc->toFH($output, 1);
+				close $output;
+				my $output_round = create_handle("app/src/main/res/mipmap-anydpi/ic_launcher_round.xml");
+				$icondoc->toFH($output_round, 1);
+				close $output_round;
+			} else {
+				die("Unknown icon type: ", $kind);
+			}
+		};
+
+		# from ikegami on SO; Licensed under CC-BY-SA 3.0
+		# https://stackoverflow.com/a/45873444/10890264
+		sub force_symlink {
+			my ($target, $new) = @_;
+			if (!symlink($target, $new)) {
+				if ($!{EEXIST}) {
+					unlink($new) or die("Can't remove \"$new\": $!");
+					symlink($target, $new) or die("Can't create symlink \"$new\": $!");
+				} else {
+					die("Can't create symlink \"$new\": $!");
+				}
+			}
+		}
+
+		# A small hack to let pixiewood build applications within the gtk codebase
+		my $java_sources = $appx->findvalue('//pw:app/pw:build/@java-sources');
+		$java_sources = "subprojects/gtk/gdk/android/glue/java/" unless defined $java_sources;
+		force_symlink rel2abs(catfile($java_sources, "org/gtk/android")), catfile($output_dir, "app/src/main/java/org/gtk/android") or die "Failed to symlink java sources: $!";
+
+		force_symlink "../../../../root/lib", catfile($output_dir, "app/src/main/jniLibs") or die "Failed to symlink libraries: $!";
+	},
+	"build" => sub {
+		my $num = $arches->size;
+
+		my $parallel = `nproc`;
+		$parallel = 1 if $? != 0;
+		$parallel = max ($parallel / $num, 1);
+		print "Building $num instances a $parallel threads" if $verbose;
+
+		my $builds = ParallelRunner->new;
+		while (defined(my $arch = $arches->each)) {
+			my @cmd = ($ninja, "-j", $parallel,
+			           "-C", "$pixiewood_dirname/bin-$arch");
+			$builds->launch(@cmd);
+		}
+		die "Ninja build failed, see logs for more info" unless $builds->wait();
+
+		# Lets not run the install in parallel
+		while (defined(my $arch = $arches->each)) {
+			my @cmd = ($meson, "install",
+			           "-C", "$pixiewood_dirname/bin-$arch",
+			           "--destdir", rel2abs("$pixiewood_dirname/root"),
+			           "--tags", "runtime");
+			run \@cmd or die('Failed to install files');
+		}
+
+		my $gradle = fork;
+		die "fork failed: $!" unless defined $gradle;
+
+		if ($gradle == 0) {
+			$ENV{ANDROID_HOME} = $sdk;
+			chdir "$pixiewood_dirname/android" or die("Failed to enter android directory: $!");
+			exec ("./gradlew", "build") or die "exec failed: $!";
+		}
+
+		waitpid($gradle, 0);
+		die "Gradle build failed" unless $? == 0;
+	}
+);
+
+if (exists $actions{$action}) {
+	$actions{$action}->();
+} else {
+	usage("Invalid action specified: $action");
+}

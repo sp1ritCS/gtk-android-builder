@@ -1,0 +1,11 @@
+diff --git a/demos/gtk-demo/org.gtk.Demo4.appdata.xml.in b/demos/gtk-demo/org.gtk.Demo4.appdata.xml.in
+index 87f9267e67..6a80e4e0ad 100644
+--- a/demos/gtk-demo/org.gtk.Demo4.appdata.xml.in
++++ b/demos/gtk-demo/org.gtk.Demo4.appdata.xml.in
+@@ -1,5 +1,5 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+-<component type="desktop">
++<component type="desktop" xmlns="https://specifications.freedesktop.org/metainfo/1.0">
+   <id>org.gtk.Demo4</id>
+   <launchable type="desktop-id">org.gtk.Demo4.desktop</launchable>
+   <metadata_license>CC0-1.0</metadata_license>
