@@ -1,3 +1,16 @@
+diff --git a/demos/gtk-demo/meson.build b/demos/gtk-demo/meson.build
+index bd32cb57f2..6bd2b6e64d 100644
+--- a/demos/gtk-demo/meson.build
++++ b/demos/gtk-demo/meson.build
+@@ -234,7 +234,7 @@ endforeach
+ 
+ gtkdemo_deps += [ profile_conf_h ]
+ 
+-executable('gtk4-demo',
++gnome.executable('gtk4-demo',
+   sources: [demos, demos_h, extra_demo_sources, gtkdemo_resources],
+   c_args: demo_cflags,
+   dependencies: gtkdemo_deps,
 diff --git a/demos/gtk-demo/org.gtk.Demo4.appdata.xml.in b/demos/gtk-demo/org.gtk.Demo4.appdata.xml.in
 index 87f9267e67..6a80e4e0ad 100644
 --- a/demos/gtk-demo/org.gtk.Demo4.appdata.xml.in

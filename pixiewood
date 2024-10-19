@@ -267,7 +267,8 @@ my %actions = (
 			local $/;
 			my $json = decode_json <$fh>;
 			close $fh;
-			grep { defined $_->{android_usecase} and $_->{android_usecase} eq 'application' } @$json
+			# TODO: filter out anything that wasn't produced by gnome.executable (not possible yet)
+			@$json;
 		};
 		my $target = $appx->findvalue('//pw:app/pw:build/@target');
 		@targets = grep { $_->{name} eq $target } @targets if $target;
