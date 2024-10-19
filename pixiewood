@@ -465,18 +465,15 @@ my %actions = (
 			}
 		};
 
-		# from ikegami on SO; Licensed under CC-BY-SA 3.0
-		# https://stackoverflow.com/a/45873444/10890264
 		sub force_symlink {
 			my ($target, $new) = @_;
-			if (!symlink($target, $new)) {
-				if ($!{EEXIST}) {
-					unlink($new) or die("Can't remove \"$new\": $!");
-					symlink($target, $new) or die("Can't create symlink \"$new\": $!");
-				} else {
-					die("Can't create symlink \"$new\": $!");
-				}
+
+			return 1 if symlink($target, $new);
+			if ($!{EEXIST}) {
+				unlink($new) or return undef;
+				symlink($target, $new) or return undef;
 			}
+			return undef;
 		}
 
 		# A small hack to let pixiewood build applications within the gtk codebase
