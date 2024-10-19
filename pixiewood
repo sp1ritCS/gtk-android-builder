@@ -21,6 +21,7 @@ use warnings;
 use Archive::Tar;
 use File::Basename qw(fileparse);
 use File::Copy qw(copy);
+use File::Find qw(find);
 use File::Path qw(make_path);
 use File::Spec::Functions qw(catfile rel2abs);
 use Getopt::Long qw(GetOptions);
@@ -507,6 +508,46 @@ my %actions = (
 			           "--tags", "runtime");
 			run \@cmd or die('Failed to install files');
 		}
+
+		our $asset_install_dir = "$pixiewood_dirname/android/app/src/main/assets/";
+
+		our $root = "$pixiewood_dirname/root";
+		our @filtered = ("bin", "lib", "share/glib-2.0/schemas");
+		sub pre_asset_copy {
+			my $pattern = join('|', map { quotemeta($_) } @filtered);
+			grep { catfile($File::Find::dir, $_) !~ /($pattern)$/ } @_
+		}
+		sub do_asset_copy {
+			my $path = $File::Find::name;
+			$path =~ s/^\Q$root\E//;
+			$path = catfile $asset_install_dir, $path;
+
+			if (-d $_) {
+				make_path $path;
+			} elsif (-f $_) {
+				copy($_, $path) or die "Failed to copy file from $_ to $path: $!";
+			}
+		}
+		find { preprocess => \&pre_asset_copy, wanted => \&do_asset_copy, no_chdir => 1 }, $root;
+
+		do {
+			my $root_schemas = catfile $pixiewood_dirname, "root", "share/glib-2.0/schemas";
+			if (-d $root_schemas) {
+				my $schemadir = catfile $asset_install_dir, "share/glib-2.0/schemas";
+				make_path $schemadir;
+				my @cmd = ("glib-compile-schemas", # this is best run on a system with the same endianess as the target
+				           "--targetdir", $schemadir,
+					   $root_schemas);
+				run \@cmd or die("Failed to compile schemas");
+			}
+		};
+
+		do {
+			open my $fh, '>', catfile($asset_install_dir, "afpr") or die "Failed to create asset fingerprint file: $!";
+			binmode $fh;
+			print $fh map { pack("C", rand(256)) } 1..128; # file fingerprint with 128 random bytes
+			close $fh;
+		};
 
 		my $gradle = fork;
 		die "fork failed: $!" unless defined $gradle;
