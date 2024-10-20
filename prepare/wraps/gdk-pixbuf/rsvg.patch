@@ -1,0 +1,341 @@
+From b6a3637b0c68e97234789b5bb2066237d4fe9d26 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20=22sp1rit=22=E2=80=8B?= <sp1rit@disroot.org>
+Date: Sun, 20 Oct 2024 16:01:26 +0200
+Subject: [PATCH] svg: builtin svg loader
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Signed-off-by: Florian "sp1rit"​ <sp1rit@disroot.org>
+---
+ gdk-pixbuf/gdk-pixbuf-io.c |   7 ++
+ gdk-pixbuf/io-svg.c        | 217 +++++++++++++++++++++++++++++++++++++
+ gdk-pixbuf/meson.build     |   4 +
+ meson.build                |  10 ++
+ meson_options.txt          |   6 +-
+ 5 files changed, 243 insertions(+), 1 deletion(-)
+ create mode 100644 gdk-pixbuf/io-svg.c
+
+diff --git a/gdk-pixbuf/gdk-pixbuf-io.c b/gdk-pixbuf/gdk-pixbuf-io.c
+index e1df590..4acd027 100644
+--- a/gdk-pixbuf/gdk-pixbuf-io.c
++++ b/gdk-pixbuf/gdk-pixbuf-io.c
+@@ -625,6 +625,9 @@ gdk_pixbuf_io_init_builtin (void)
+ #ifdef INCLUDE_pnm
+         load_one_builtin_module (pnm);
+ #endif
++#ifdef INCLUDE_svg
++	load_one_builtin_module (svg);
++#endif
+ #ifdef INCLUDE_tiff
+         load_one_builtin_module (tiff);
+ #endif
+@@ -684,6 +687,7 @@ gdk_pixbuf_io_init (void)
+ 
+ module (png);
+ module (jpeg);
++module (svg);
+ module (gif);
+ module (ico);
+ module (ani);
+@@ -777,6 +781,9 @@ gdk_pixbuf_load_module_unlocked (GdkPixbufModule *image_module,
+ #ifdef INCLUDE_qtif
+         try_module (qtif,qtif);
+ #endif
++#ifdef INCLUDE_svg
++	try_module (svg,svg);
++#endif
+ 
+ #undef try_module
+         
+diff --git a/gdk-pixbuf/io-svg.c b/gdk-pixbuf/io-svg.c
+new file mode 100644
+index 0000000..90aab35
+--- /dev/null
++++ b/gdk-pixbuf/io-svg.c
+@@ -0,0 +1,217 @@
++/* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 8 -*- */
++/* GdkPixbuf library - SVG image loader
++ *
++ * Copyright (C) 2002 Matthias Clasen
++ * Copyright (C) 2002-2004 Dom Lachowicz
++ *
++ * Authors: Matthias Clasen <maclas@gmx.de>
++ *          Dom Lachowicz <cinamod@hotmail.com>
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more  * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the
++ * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
++ * Boston, MA 02111-1307, USA.
++ */
++
++#include "config.h"
++
++#include <stdlib.h>
++
++#include <rsvg.h>
++#include <gdk-pixbuf/gdk-pixbuf.h>
++
++#define N_(string) (string)
++#define _(string) (string)
++
++typedef struct {
++        RsvgHandle                 *handle;
++
++        GdkPixbufModuleUpdatedFunc  updated_func;
++        GdkPixbufModulePreparedFunc prepared_func;
++        GdkPixbufModuleSizeFunc     size_func;
++
++        gboolean                    first_write;
++
++        gpointer                    user_data;
++} SvgContext;
++
++enum {
++        ERROR_WRITING = 1,
++        ERROR_DISPLAYING_IMAGE
++} RsvgLoaderErrorReasons;
++
++static void
++rsvg_propegate_error (GError ** err,
++                      const char * reason,
++                      gint code)
++{
++        if (err) {
++                *err = NULL;
++                g_set_error (err, rsvg_error_quark (), code, "%s", reason);
++        }
++}
++
++static gpointer
++gdk_pixbuf__svg_image_begin_load (GdkPixbufModuleSizeFunc size_func,
++                                  GdkPixbufModulePreparedFunc prepared_func,
++                                  GdkPixbufModuleUpdatedFunc  updated_func,
++                                  gpointer user_data,
++                                  GError **error)
++{
++        SvgContext *context    = g_new0 (SvgContext, 1);
++
++        if (error)
++                *error = NULL;
++
++        context->first_write   = TRUE;
++        context->size_func     = size_func;
++
++        context->prepared_func = prepared_func;
++        context->updated_func  = updated_func;
++        context->user_data     = user_data;
++
++        return context;
++}
++
++static void
++emit_updated (SvgContext *context, GdkPixbuf *pixbuf)
++{
++        if (context->updated_func != NULL)
++                (* context->updated_func) (pixbuf,
++                                           0, 0,
++                                           gdk_pixbuf_get_width (pixbuf),
++                                           gdk_pixbuf_get_height (pixbuf),
++                                           context->user_data);
++}
++
++static void
++emit_prepared (SvgContext *context, GdkPixbuf *pixbuf)
++{
++        if (context->prepared_func != NULL)
++                (* context->prepared_func) (pixbuf, NULL, context->user_data);
++}
++
++static gboolean
++gdk_pixbuf__svg_image_load_increment (gpointer data,
++				      const guchar *buf, guint size,
++				      GError **error)
++{
++        SvgContext *context = (SvgContext *)data;
++
++        if (error)
++                *error = NULL;
++
++        if (context->first_write == TRUE) {
++                context->first_write = FALSE;
++
++                context->handle = rsvg_handle_new ();
++
++                if (!context->handle) {
++                        rsvg_propegate_error (error, _("Error displaying image"), ERROR_DISPLAYING_IMAGE);
++                        return FALSE;
++                }
++
++                rsvg_handle_set_size_callback (context->handle, context->size_func, context->user_data, NULL);
++        }
++
++        if (!context->handle) {
++                rsvg_propegate_error (error, _("Error displaying image"), ERROR_DISPLAYING_IMAGE);
++                return FALSE;
++        }
++
++        if (!rsvg_handle_write (context->handle, buf, size, error)) {
++                rsvg_propegate_error (error, _("Error writing"), ERROR_WRITING);
++                return FALSE;
++        }
++
++        return TRUE;
++}
++
++static gboolean
++gdk_pixbuf__svg_image_stop_load (gpointer data, GError **error)
++{
++        SvgContext *context = (SvgContext *)data;
++        GdkPixbuf *pixbuf;
++        gboolean result = TRUE;
++
++        if (error)
++                *error = NULL;
++
++        if (!context->handle) {
++                rsvg_propegate_error (error, _("Error displaying image"), ERROR_DISPLAYING_IMAGE);
++                return FALSE;
++        }
++
++        rsvg_handle_close (context->handle, error);
++
++        pixbuf = rsvg_handle_get_pixbuf (context->handle);
++
++        if (pixbuf != NULL) {
++                emit_prepared (context, pixbuf);
++                emit_updated (context, pixbuf);
++                g_object_unref (pixbuf);
++        }
++        else {
++                rsvg_propegate_error (error, _("Error displaying image"), ERROR_DISPLAYING_IMAGE);
++                result = FALSE;
++        }
++
++        g_object_unref (context->handle);
++        g_free (context);
++
++        return result;
++}
++
++#ifndef INCLUDE_svg
++#define MODULE_ENTRY(function) G_MODULE_EXPORT void function
++#else
++#define MODULE_ENTRY(function) void _gdk_pixbuf__svg_ ## function
++#endif
++
++MODULE_ENTRY (fill_vtable) (GdkPixbufModule *module)
++{
++	module->begin_load     = gdk_pixbuf__svg_image_begin_load;
++	module->stop_load      = gdk_pixbuf__svg_image_stop_load;
++	module->load_increment = gdk_pixbuf__svg_image_load_increment;
++}
++
++MODULE_ENTRY (fill_info) (GdkPixbufFormat *info)
++{
++	static const GdkPixbufModulePattern signature[] = {
++			{  " <svg",  "*    ", 100 },
++			{  " <!DOCTYPE svg",  "*             ", 100 },
++			{ NULL, NULL, 0 }
++	};
++
++	static const gchar *mime_types[] = { /* yes folks, i actually have run into all of these in the wild... */
++			"image/svg+xml",
++			"image/svg",
++			"image/svg-xml",
++			"image/vnd.adobe.svg+xml",
++			"text/xml-svg",
++			"image/svg+xml-compressed",
++			NULL
++	};
++	static const gchar *extensions[] = {
++			"svg",
++			"svgz",
++			"svg.gz",
++			NULL
++	};
++
++	info->name        = "svg";
++	info->signature   = (GdkPixbufModulePattern *) signature;
++	info->description = _("Scalable Vector Graphics");
++	info->mime_types  = (gchar **) mime_types;
++	info->extensions  = (gchar **) extensions;
++	info->flags       = GDK_PIXBUF_FORMAT_SCALABLE | GDK_PIXBUF_FORMAT_THREADSAFE;
++	info->license     = "LGPL";
++}
+diff --git a/gdk-pixbuf/meson.build b/gdk-pixbuf/meson.build
+index 570625b..8315217 100644
+--- a/gdk-pixbuf/meson.build
++++ b/gdk-pixbuf/meson.build
+@@ -34,6 +34,10 @@ loaders = {
+     'sources': [ 'io-pnm.c' ],
+     'enabled': enabled_loaders.contains('pnm'),
+   },
++  'svg': {
++    'sources': [ 'io-svg.c' ],
++    'enabled': enabled_loaders.contains('svg'),
++  },
+   'tiff': {
+     'sources': [ 'io-tiff.c' ],
+     'enabled': enabled_loaders.contains('tiff'),
+@@ -144,6 +148,25 @@ if host_system == 'windows'
+   gdkpixbuf_sources += gdk_pixbuf_win_res
+ endif
+ 
++# Hacky inclusion of librsvg
++meson.override_dependency('gdk-pixbuf-2.0-headers', declare_dependency(
++  include_directories: root_inc
++))
++
++svg_opt = get_option('svg')
++if not svg_opt.disabled()
++  rsvg_dep = dependency('librsvg-2.0', required: svg_opt)
++
++  if rsvg_dep.found()
++    enabled_loaders += 'svg'
++    loaders_deps += rsvg_dep
++    loaders += {'svg': {
++      'sources': [ 'io-svg.c' ],
++      'enabled': true
++    }}
++  endif
++endif
++
+ # Check if we need to build loaders as built-in functionality
+ included_loaders_cflags = []
+ included_loaders_deps = []
+diff --git a/meson_options.txt b/meson_options.txt
+index 7483015..52c33e2 100644
+--- a/meson_options.txt
++++ b/meson_options.txt
+@@ -14,6 +14,10 @@ option('gif',
+        description: 'Enable GIF loader, disabled on Windows if "native_windows_loaders" is used',
+        type: 'feature',
+        value: 'enabled')
++option('svg',
++       description: 'Enable SVG loader (requires librsvg)',
++       type: 'feature',
++       value: 'enabled')
+ option('others',
+        description: 'Enable other loaders, which are weakly maintained',
+        type: 'feature',
+@@ -21,7 +25,7 @@ option('others',
+ option('builtin_loaders',
+        description: 'Comma-separated list of loaders to build into gdk-pixbuf',
+        type: 'array',
+-       choices: ['all', 'none', 'windows', 'png', 'bmp', 'gif', 'ico', 'ani', 'jpeg', 'pnm', 'tiff', 'xpm', 'xbm', 'tga', 'icns', 'qtif'],
++       choices: ['all', 'none', 'windows', 'png', 'bmp', 'gif', 'ico', 'ani', 'jpeg', 'pnm', 'svg', 'tiff', 'xpm', 'xbm', 'tga', 'icns', 'qtif'],
+        value: ['png', 'jpeg'])
+ option('gtk_doc',
+        description: 'Whether to generate the API reference',
+-- 
+2.47.0
+

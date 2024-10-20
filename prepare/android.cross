@@ -43,6 +43,9 @@ introspection = 'disabled'
 docs = 'disabled'
 utilities = 'disabled'
 
+[gdk-pixbuf:project options]
+builtin_loaders = ['all']
+
 [gtk:project options]
 android-backend = true
 introspection = 'disabled'

@@ -1,0 +1,353 @@
+From 30cfc20f8e798613c96a7b018a6f685a6020b495 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20=22sp1rit=22=E2=80=8B?= <sp1rit@disroot.org>
+Date: Sun, 20 Oct 2024 14:19:56 +0200
+Subject: [PATCH] librsvg-2.40.22: Limited support for meson (hack)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Special static library hackery to allow gdk-pixbuf to include librsvg as
+a builtin loader.
+
+Signed-off-by: Florian "sp1rit"​ <sp1rit@disroot.org>
+---
+ NEWS                                       |   3 +
+ meson.build                                | 149 +++++++++++++++++++++
+ rsvg-css.c                                 |   2 +-
+ subprojects/libcroco.wrap                  |  11 ++
+ subprojects/packagefiles/croco-meson.patch | 143 ++++++++++++++++++++
+ 5 files changed, 307 insertions(+), 1 deletion(-)
+ create mode 100644 meson.build
+ create mode 100644 subprojects/libcroco.wrap
+ create mode 100644 subprojects/packagefiles/croco-meson.patch
+
+diff --git a/NEWS b/NEWS
+index 93fb2e11..afd7e1b9 100644
+--- a/NEWS
++++ b/NEWS
+@@ -1,3 +1,6 @@
++Version 2.40.22
++- Added meson buildsystem support for librsvg and licroco
++
+ Version 2.40.21
+ - CVE-2019-20446 - Backport the following fixes from 2.46.x:
+ 
+diff --git a/meson.build b/meson.build
+new file mode 100644
+index 00000000..37373984
+--- /dev/null
++++ b/meson.build
+@@ -0,0 +1,131 @@
++project('librsvg', 'c',
++        version: '2.40.22',
++        default_options: [
++          'c_std=gnu11', 'warning_level=1'
++        ]
++)
++
++gnome = import('gnome')
++cc = meson.get_compiler('c')
++
++ver_split = meson.project_version().split('.')
++librsvg_api_version = '2.0'
++api_split = librsvg_api_version.split('.')
++librsvg_api_major = api_split[0]
++librsvg_api_minor = api_split[1]
++
++rsvg_ver = 'rsvg-@0@'.format(librsvg_api_major)
++
++glib_required          = '>= 2.24.0'
++gio_required           = '>= 2.24.0'
++libxml_required        = '>= 2.9.0'
++cairo_required         = '>= 1.2.0'
++pango_required         = '>= 1.38.0'
++gdk_pixbuf_required    = '>= 2.20'
++croco_required         = '>= 0.6.1'
++
++glib_dep       = dependency('glib-2.0',
++                            version: glib_required)
++gio_dep        = dependency('gio-2.0',
++                            version: gio_required)
++libxml_dep     = dependency('libxml-2.0',
++                            version: libxml_required)
++cairo_dep      = dependency('cairo',
++                            version: cairo_required)
++cairo_png_dep  = dependency('cairo-png',
++                            version: cairo_required)
++pangocairo_dep = dependency('pangocairo',
++                            version: pango_required)
++pangoft2_dep   = dependency('pangoft2',
++                            version: pango_required)
++gdk_pixbuf_dep = dependency('gdk-pixbuf-2.0-headers',
++                            version: gdk_pixbuf_required)
++croco_dep      = dependency('libcroco-0.6',
++                            version: croco_required)
++
++libm           = cc.find_library('m', required: false)
++
++config = configuration_data()
++config.set('HAVE_PANGOFT2', pangoft2_dep.found())
++config.set('HAVE_LC_MESSAGES', true)
++config.set('HAVE_STRINGS_H', cc.has_header('strings.h'))
++config.set('HAVE_STRTOK_R', cc.has_function('strtok_r', prefix: '#include <string.h>'))
++config.set('HAVE_FLOAT_H', cc.has_header('float.h'))
++config.set_quoted('VERSION', meson.project_version())
++configure_file(output: 'config.h', configuration: config)
++
++features = configuration_data()
++features.set('LIBRSVG_MAJOR_VERSION', ver_split[0])
++features.set('LIBRSVG_MINOR_VERSION', ver_split[1])
++features.set('LIBRSVG_MICRO_VERSION', ver_split[2])
++features.set('PACKAGE_VERSION', meson.project_version())
++configure_file(input: 'librsvg-features.h.in',
++               output: 'librsvg-features.h',
++               configuration: features)
++
++librsvg_headers = [
++  'rsvg.h',
++  'rsvg-cairo.h'
++]
++
++librsvg_src = [
++  'librsvg-features.c',
++  'rsvg-css.c',
++  'rsvg-defs.c',
++  'rsvg-image.c',
++  'rsvg-io.c',
++  'rsvg-paint-server.c' ,
++  'rsvg-path.c',
++  'rsvg-base-file-util.c' ,
++  'rsvg-filter.c',
++  'rsvg-marker.c',
++  'rsvg-mask.c',
++  'rsvg-shapes.c',
++  'rsvg-structure.c',
++  'rsvg-styles.c',
++  'rsvg-text.c',
++  'rsvg-cond.c',
++  'rsvg-base.c',
++  'rsvg-cairo-draw.c',
++  'rsvg-cairo-render.c',
++  'rsvg-cairo-clip.c',
++  'rsvg.c',
++  'rsvg-gobject.c',
++  'rsvg-file-util.c',
++  'rsvg-size-callback.c',
++  'rsvg-xml.c',
++]
++
++enums = gnome.mkenums_simple('librsvg-enum-types', sources: librsvg_headers)
++
++rsvg_lib = static_library(rsvg_ver, librsvg_src, enums,
++  c_args: [
++    '-DRSVG_COMPILATION',
++    '-DG_LOG_DOMAIN="librsvg"',
++    '-DSRCDIR="@0@"'.format(meson.project_source_root()),
++    '-DRSVG_DISABLE_DEPRECATION_WARNINGS'
++  ],
++  dependencies: [
++    gdk_pixbuf_dep,
++    glib_dep,
++    gio_dep,
++    libxml_dep,
++    pangocairo_dep,
++    pangoft2_dep,
++    cairo_dep,
++    cairo_png_dep,
++    croco_dep,
++    libm
++  ],
++)
++
++librsvg_dep = declare_dependency(
++  link_with: rsvg_lib,
++  include_directories: include_directories('.'),
++  dependencies: [
++    glib_dep,
++    gio_dep,
++    gdk_pixbuf_dep,
++    cairo_dep
++  ]
++)
+diff --git a/rsvg-css.c b/rsvg-css.c
+index 5b359a20..d44966ba 100644
+--- a/rsvg-css.c
++++ b/rsvg-css.c
+@@ -863,7 +863,7 @@ rsvg_css_parse_xml_attribute_string (const char *attribute_string)
+ 
+     memset (&handler, 0, sizeof (handler));
+     xmlSAX2InitDefaultSAXHandler (&handler, 0);
+-    handler.serror = rsvg_xml_noerror;
++    handler.serror = (xmlStructuredErrorFunc)rsvg_xml_noerror;
+     parser = xmlCreatePushParserCtxt (&handler, NULL, tag, strlen (tag) + 1, NULL);
+     parser->options |= XML_PARSE_NONET;
+ 
+diff --git a/subprojects/libcroco.wrap b/subprojects/libcroco.wrap
+new file mode 100644
+index 00000000..36b9f6de
+--- /dev/null
++++ b/subprojects/libcroco.wrap
+@@ -0,0 +1,11 @@
++[wrap-git]
++directory = libcroco
++url = https://gitlab.com/inkscape/libcroco.git
++push-url = git@gitlab.com:inkscape/libcroco.git
++revision = master
++depth = 1
++
++diff_files = croco-meson.patch
++
++[provide]
++libcroco-0.6 = libcroco_dep
+diff --git a/subprojects/packagefiles/croco-meson.patch b/subprojects/packagefiles/croco-meson.patch
+new file mode 100644
+index 00000000..76c05986
+--- /dev/null
++++ b/subprojects/packagefiles/croco-meson.patch
+@@ -0,0 +1,143 @@
++From 0d1c198691c87f2ac061e08a8cf09507af560025 Mon Sep 17 00:00:00 2001
++From: =?UTF-8?q?Florian=20=22sp1rit=22=E2=80=8B?= <sp1rit@disroot.org>
++Date: Sun, 20 Oct 2024 14:17:13 +0200
++Subject: [PATCH] meson: Limited support for building with meson
++MIME-Version: 1.0
++Content-Type: text/plain; charset=UTF-8
++Content-Transfer-Encoding: 8bit
++
++Signed-off-by: Florian "sp1rit"​ <sp1rit@disroot.org>
++---
++ libcroco        |  1 +
++ meson.build     | 20 ++++++++++++
++ src/meson.build | 82 +++++++++++++++++++++++++++++++++++++++++++++++++
++ 3 files changed, 103 insertions(+)
++ create mode 120000 libcroco
++ create mode 100644 meson.build
++ create mode 100644 src/meson.build
++
++diff --git a/libcroco b/libcroco
++new file mode 120000
++index 0000000..aa8e45f
++--- /dev/null
+++++ b/libcroco
++@@ -0,0 +1 @@
+++src/
++\ No newline at end of file
++diff --git a/meson.build b/meson.build
++new file mode 100644
++index 0000000..3e42b75
++--- /dev/null
+++++ b/meson.build
++@@ -0,0 +1,20 @@
+++project('libcroco', 'c',
+++        version: '0.6.99',
+++        default_options: [
+++          'c_std=gnu11', 'warning_level=0'
+++        ]
+++)
+++
+++ver_split = meson.project_version().split('.')
+++cc = meson.get_compiler('c')
+++
+++glib_required   = '>= 2.0'
+++libxml_required = '>= 2.4.23'
+++
+++glib_dep   = dependency('glib-2.0',
+++                        version: glib_required)
+++libxml_dep = dependency('libxml-2.0',
+++                        version: libxml_required)
+++
+++root = include_directories('.')
+++subdir('src')
++diff --git a/src/meson.build b/src/meson.build
++new file mode 100644
++index 0000000..5caa275
++--- /dev/null
+++++ b/src/meson.build
++@@ -0,0 +1,82 @@
+++config = configuration_data()
+++config.set('LIBCROCO_VERSION', meson.project_version())
+++cr_version_num = run_command('expr', ver_split[0], '*', '10000', '+', ver_split[1], '*', '100', '+', ver_split[2], check: true).stdout().strip()
+++config.set('LIBCROCO_VERSION_NUMBER', 0)
+++config.set('G_DISABLE_CHECKS', 0)
+++configure_file(input: 'libcroco-config.h.in',
+++               output: 'libcroco-config.h',
+++               configuration: config)
+++
+++cr_src = [
+++  'cr-utils.c',
+++  'cr-utils.h',
+++  'cr-input.c',
+++  'cr-input.h',
+++  'cr-enc-handler.c',
+++  'cr-enc-handler.h',
+++  'cr-libxml-node-iface.c',
+++  'cr-node-iface.h',
+++  'cr-num.c',
+++  'cr-num.h',
+++  'cr-rgb.c',
+++  'cr-rgb.h',
+++  'cr-token.c',
+++  'cr-token.h',
+++  'cr-tknzr.c',
+++  'cr-tknzr.h',
+++  'cr-term.c',
+++  'cr-term.h',
+++  'cr-attr-sel.c',
+++  'cr-attr-sel.h',
+++  'cr-pseudo.c',
+++  'cr-pseudo.h',
+++  'cr-additional-sel.c',
+++  'cr-additional-sel.h',
+++  'cr-simple-sel.c',
+++  'cr-simple-sel.h',
+++  'cr-selector.c',
+++  'cr-selector.h',
+++  'cr-doc-handler.c',
+++  'cr-doc-handler.h',
+++  'cr-parser.c',
+++  'cr-parser.h',
+++  'cr-declaration.c',
+++  'cr-declaration.h',
+++  'cr-statement.c',
+++  'cr-statement.h',
+++  'cr-stylesheet.c',
+++  'cr-stylesheet.h',
+++  'cr-cascade.c',
+++  'cr-cascade.h',
+++  'cr-om-parser.c',
+++  'cr-om-parser.h',
+++  'cr-style.c',
+++  'cr-style.h',
+++  'cr-sel-eng.c',
+++  'cr-sel-eng.h',
+++  'cr-fonts.c',
+++  'cr-fonts.h',
+++  'cr-prop-list.c',
+++  'cr-prop-list.h',
+++  'cr-parsing-location.c',
+++  'cr-parsing-location.h',
+++  'cr-string.c',
+++]
+++
+++cr_dep = library('croco', cr_src,
+++  dependencies: [
+++    glib_dep,
+++    libxml_dep,
+++    cc.find_library('m', required : false)
+++  ],
+++  install: true,
+++  version: meson.project_version()
+++)
+++
+++libcroco_dep = declare_dependency(
+++  link_with: cr_dep,
+++  include_directories: [
+++    root,
+++    include_directories('.')
+++  ]
+++)
++-- 
++2.47.0
++
+-- 
+2.47.0
+
