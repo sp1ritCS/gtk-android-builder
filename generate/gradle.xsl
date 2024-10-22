@@ -12,6 +12,8 @@
 >
 	<xsl:output method="text" encoding="UTF-8"/>
 
+	<xsl:param name="abis"/>
+
 	<xsl:template match="/pw:app">
 		<xsl:variable name="id" select="pw:metainfo/meta:component/meta:id[not(@xml:lang)]" />
 		<xsl:variable name="package" select="translate($id, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')"/>
@@ -31,6 +33,10 @@ android {
         versionName "<xsl:value-of select='(//pw:metainfo//meta:component//meta:releases//meta:release//@version)[last()]'/>"
 
         multiDexEnabled false
+
+        ndk {
+            abiFilters <xsl:value-of select="$abis" />
+        }
     }
 
     buildTypes {
@@ -38,12 +44,20 @@ android {
             minifyEnabled false
         }
         release {
-            minifyEnabled true
+            minifyEnabled false
         }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
+    }
+    splits {
+        abi {
+            enable true
+            reset()
+            include <xsl:value-of select="$abis" />
+            universalApk true
+        }
     }
 
     lint {

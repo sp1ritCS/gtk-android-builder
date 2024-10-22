@@ -46,6 +46,7 @@ my $sdk;
 my $toolchain; # TODO: automatically determine good toolchain
 
 my $dir = ".";
+my $release = 0;
 my $verbose = 0;
 
 my $help = 0;
@@ -65,6 +66,7 @@ Options:
   --meson <EXECUTABLE>            Specify the executable for the meson buildsystem
   --ninja <EXECUTABLE             Specify the executable for the ninja buildsystem
   -C, --change-dir <DIR>          The project source root of the project to build
+  --release                       Create a release instead of debug build
   -v, --verbose                   Enable verbose output
   --help                          Display this help message
   -V, --version                   Display version and debug information
@@ -101,6 +103,7 @@ GetOptions(
 	"meson=s" => \$meson,
 	"ninja=s" => \$ninja,
 	"change-dir|C=s" => \$dir,
+	"release" => \$release,
 	"verbose|v" => \$verbose,
 	"help" => \$help,
 	"version" => \$cversion,
@@ -247,6 +250,8 @@ my %actions = (
 			           "--cross-file", "$pixiewood_dirname/toolchain.cross",
 			           "--cross-file", "$asset_dir/prepare/arch/$arch.cross",
 			           "--cross-file", "$asset_dir/prepare/android.cross",
+				   "--buildtype", $release ? "release" : "debug",
+				   $release ? "--strip" : (),
 			           @options,
 			          "$pixiewood_dirname/bin-$arch", ".");
 			$configures->launch(@cmd);
@@ -263,6 +268,7 @@ my %actions = (
 		my @targets = do {
 			my $arch = $arches->each;
 			$arches->size; # reset the iterator
+
 			my $file = "$pixiewood_dirname/bin-$arch/meson-info/intro-targets.json";
 			open(my $fh, "<", $file) or die("Failed to open target introspection $file: $!");
 			local $/;
@@ -295,6 +301,17 @@ my %actions = (
 			return $fh;
 		}
 
+		# ABIs for ndkFilter, expects abi value in crossfile to be quoted
+		my $abis = do {
+			sub abi_for_arch {
+				my $arch = shift;
+				my $cf = Glib::KeyFile->new;
+				$cf->load_from_file("$asset_dir/prepare/arch/$arch.cross", "none");
+				return $cf->get_string("constants", "abi");
+			}
+			join(',', map { abi_for_arch $_ } $arches->members)
+		};
+
 		my @stylesheets = (
 			("settings.xsl", "settings.gradle"),
 			("gradle.xsl", "app/build.gradle"),
@@ -307,7 +324,7 @@ my %actions = (
 		for my ($stylesheet_file, $dest) (@stylesheets) {
 			my $style_doc = XML::LibXML->load_xml(location => catfile("$asset_dir/generate", $stylesheet_file), no_cdata => 1);
 			my $stylesheet = $xslt->parse_stylesheet($style_doc);
-			my $results = $stylesheet->transform($app_doc, XML::LibXSLT::xpath_to_string(libname => "$libname"));
+			my $results = $stylesheet->transform($app_doc, XML::LibXSLT::xpath_to_string(libname => $libname, abis => $abis));
 
 			my $fh = create_handle $dest;
 			$stylesheet->output_fh($results, $fh);
@@ -473,6 +490,7 @@ my %actions = (
 			if ($!{EEXIST}) {
 				unlink($new) or return undef;
 				symlink($target, $new) or return undef;
+				return 1;
 			}
 			return undef;
 		}
@@ -553,9 +571,24 @@ my %actions = (
 		die "fork failed: $!" unless defined $gradle;
 
 		if ($gradle == 0) {
+			my $buildtype = do {
+				my $arch = $arches->each;
+				$arches->size; # reset the iterator
+
+				my $file = "$pixiewood_dirname/bin-$arch/meson-info/intro-buildoptions.json";
+				open(my $fh, "<", $file) or die("Failed to open buildoptions introspection $file: $!");
+				local $/;
+				my $json = decode_json <$fh>;
+				close $fh;
+				my @filtered = grep { $_->{name} eq "buildtype" } @$json;
+				scalar @filtered == 0 ? "debug" : $filtered[0]->{value};
+			};
+
 			$ENV{ANDROID_HOME} = $sdk;
 			chdir "$pixiewood_dirname/android" or die("Failed to enter android directory: $!");
-			exec ("./gradlew", "build") or die "exec failed: $!";
+			exec ("./gradlew",
+			      ($buildtype eq "release" or $buildtype eq "minsize") ? "assembleRelease" : "assembleDebug"
+			) or die "exec failed: $!";
 		}
 
 		waitpid($gradle, 0);
