@@ -120,15 +120,59 @@ usage("Manifest not specified") unless defined $app_path;
 usage("Android SDK directory not specified") unless defined $sdk;
 usage("Android NDK (Toolchain) directory not specified") unless defined $toolchain;
 
-my $app_doc = XML::LibXML->load_xml(location => $app_path, expand_entities => 1);
+my $pixiewood_dir = catfile($dir, $pixiewood_dirname);
+make_path($pixiewood_dir);
+chdir $dir or die("Failed to enter source directory: $!");
+
+
+sub path_from_uri {
+	my $uri = shift;
+	my ($dir,$path) = $uri =~ m/^(src|build):(.*)$/;
+	return $uri unless defined $dir and defined $path;
+	if ($dir eq "src") {
+		return catfile ".", $path;
+	} elsif ($dir eq "build") {
+		my ($arch,$path) = $path =~ m/^\/*([a-z0-9_]*)\/(.*)$/;
+		return catfile ".", $pixiewood_dirname, "bin-$arch", $path;
+	}
+	return $path;
+};
+
+my $xml_protos = XML::LibXML::InputCallback->new();
+$xml_protos->register_callbacks([
+	sub {
+		my $uri = shift;
+		return $uri =~ /^(src|build):/;
+	},
+	sub {
+		my $uri = shift;
+		my $fh;
+		open $fh, "<", path_from_uri($uri) or do {
+			my $default = '<?xml version="1.0" encoding="UTF-8"?><undef/>';
+			open $fh, '<', \$default or die "Failed to create handle for default metainfo document: $!";
+		};
+		return $fh;
+	},
+	sub {
+		my ($fh, $len) = @_;
+		my $buffer;
+		read($fh, $buffer, $len);
+		return $buffer;
+	},
+	sub {
+		my $fh = shift;
+		close $fh;
+	}
+]);
+
+my $parser = XML::LibXML->new();
+$parser->input_callbacks($xml_protos);
+
+my $app_doc = $parser->load_xml(location => $app_path, xinclude => 1);
 
 my $appx = XML::LibXML::XPathContext->new($app_doc);
 $appx->registerNs("pw", "https://sp1rit.arpa/pixiewood/");
 $appx->registerNs("meta", "https://specifications.freedesktop.org/metainfo/1.0");
-
-my $pixiewood_dir = catfile($dir, $pixiewood_dirname);
-make_path($pixiewood_dir);
-chdir $dir or die("Failed to enter source directory: $!");
 
 my $arches = Set::Scalar->new("aarch64", "armv7a", "i686", "x86_64");
 my $architectures = $appx->findnodes("/pw:app/pw:build/pw:architectures")->shift;
@@ -260,7 +304,7 @@ my %actions = (
 	},
 	"generate" => sub {
 		my $id = $appx->findvalue("/pw:app/pw:metainfo/meta:component/meta:id[not(\@xml:lang)]");
-		die("Unable to find component id in manifest") unless $id;
+		die("Unable to find component id in manifest, if you are using XInclude ensure that the path is correct") unless $id;
 		my @id_parts = split /\./, $id;
 		my $package = lc(join('/', @id_parts));
 		my $class = $id_parts[-1] . "App";
@@ -369,7 +413,7 @@ my %actions = (
 					my $output = create_handle($dest);
 
 					if ($type eq "avd") {
-						my $path = $drawable->getAttribute("path") or die("Drawable is missing path");
+						my $path = path_from_uri $drawable->getAttribute("path") or die("Drawable is missing path");
 						open (my $fh, '<', $path);
 						while (my $line = <$fh>) {
 							print $output $line;
@@ -377,7 +421,7 @@ my %actions = (
 						close $fh;
 					} elsif ($type eq "svg") {
 						$ENV{'STUDIO_DIR'} = $studio_dir;
-						my $path = $drawable->getAttribute("path") or die("Drawable is missing path");
+						my $path = path_from_uri $drawable->getAttribute("path") or die("Drawable is missing path");
 						my @cmd = (catfile("$asset_dir/generate", "Svg2Avd"), $path);
 
 						my $scale = $drawable->getAttribute("scale");
