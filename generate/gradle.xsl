@@ -30,7 +30,7 @@ android {
         minSdk 31
         targetSdk 34
         versionCode <xsl:value-of select="count(pw:metainfo/meta:component/meta:releases/meta:release)" />
-        versionName "<xsl:value-of select='(//pw:metainfo//meta:component//meta:releases//meta:release//@version)[last()]'/>"
+        versionName "<xsl:value-of select='pw:vermax(//pw:metainfo//meta:component//meta:releases//meta:release//@version)'/>"
 
         multiDexEnabled false
 

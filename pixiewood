@@ -26,13 +26,16 @@ use File::Path qw(make_path);
 use File::Spec::Functions qw(catfile rel2abs);
 use Getopt::Long qw(GetOptions);
 use Glib;
+use Glib::Object::Introspection;
 use IPC::Run qw(run);
 use JSON;
-use List::Util qw(max);
+use List::Util qw(max reduce);
 use POSIX ":sys_wait_h";
 use Set::Scalar;
 use XML::LibXML;
 use XML::LibXSLT;
+
+Glib::Object::Introspection->setup(basename => 'AppStream', version => '1.0', package => 'As');
 
 my $version = "0";
 my $pixiewood_dirname = ".pixiewood";
@@ -167,6 +170,10 @@ $xml_protos->register_callbacks([
 
 my $parser = XML::LibXML->new();
 $parser->input_callbacks($xml_protos);
+
+XML::LibXSLT->register_function("https://sp1rit.arpa/pixiewood/", "vermax", sub {
+	reduce { As::vercmp ($a, $b, "none") > 0 ? $a : $b } map { $_->value } shift->get_nodelist
+});
 
 my $app_doc = $parser->load_xml(location => $app_path, xinclude => 1);
 
