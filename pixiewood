@@ -497,7 +497,7 @@ my %actions = (
 
 		# A small hack to let pixiewood build applications within the gtk codebase
 		my $java_sources = $appx->findvalue('//pw:app/pw:build/@java-sources');
-		$java_sources = "subprojects/gtk/gdk/android/glue/java/" unless defined $java_sources;
+		$java_sources = "subprojects/gtk/gdk/android/glue/java/" unless $java_sources;
 		force_symlink rel2abs(catfile($java_sources, "org/gtk/android")), catfile($output_dir, "app/src/main/java/org/gtk/android") or die "Failed to symlink java sources: $!";
 
 		force_symlink "../../../../root/lib", catfile($output_dir, "app/src/main/jniLibs") or die "Failed to symlink libraries: $!";
