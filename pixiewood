@@ -121,7 +121,13 @@ usage("Action not specified") unless defined $action;
 my $app_path = shift @ARGV;
 usage("Manifest not specified") unless defined $app_path;
 usage("Android SDK directory not specified") unless defined $sdk;
-usage("Android NDK (Toolchain) directory not specified") unless defined $toolchain;
+$toolchain = do {
+	opendir(my $dir, "$sdk/ndk") or die "Failed to open NDK toolchain dir: $!";
+	my $newest = reduce { As::vercmp ($a, $b, "none") > 0 ? $a : $b } grep { !/^\./ } readdir($dir);
+	closedir($dir);
+	defined $newest ? catfile $sdk, "ndk", $newest : undef
+} unless defined $toolchain;
+usage("Unable to detect Android NDK (Toolchain), try specifing it") unless defined $toolchain;
 
 my $pixiewood_dir = catfile($dir, $pixiewood_dirname);
 make_path($pixiewood_dir);
