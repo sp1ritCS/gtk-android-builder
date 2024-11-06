@@ -50,6 +50,7 @@ my $toolchain; # TODO: automatically determine good toolchain
 
 my $dir = ".";
 my $release = 0;
+my $skip_gradle = 0;
 my $verbose = 0;
 
 my $help = 0;
@@ -70,6 +71,7 @@ Options:
   --ninja <EXECUTABLE             Specify the executable for the ninja buildsystem
   -C, --change-dir <DIR>          The project source root of the project to build
   --release                       Create a release instead of debug build
+  --skip-gradle                   Skip the building of the Android Package
   -v, --verbose                   Enable verbose output
   --help                          Display this help message
   -V, --version                   Display version and debug information
@@ -107,6 +109,7 @@ GetOptions(
 	"ninja=s" => \$ninja,
 	"change-dir|C=s" => \$dir,
 	"release" => \$release,
+	"skip-gradle" => \$skip_gradle,
 	"verbose|v" => \$verbose,
 	"help" => \$help,
 	"version" => \$cversion,
@@ -624,32 +627,34 @@ my %actions = (
 			close $fh;
 		};
 
-		my $gradle = fork;
-		die "fork failed: $!" unless defined $gradle;
+		unless ($skip_gradle) {
+			my $gradle = fork;
+			die "fork failed: $!" unless defined $gradle;
 
-		if ($gradle == 0) {
-			my $buildtype = do {
-				my $arch = $arches->each;
-				$arches->size; # reset the iterator
+			if ($gradle == 0) {
+				my $buildtype = do {
+					my $arch = $arches->each;
+					$arches->size; # reset the iterator
 
-				my $file = "$pixiewood_dirname/bin-$arch/meson-info/intro-buildoptions.json";
-				open(my $fh, "<", $file) or die("Failed to open buildoptions introspection $file: $!");
-				local $/;
-				my $json = decode_json <$fh>;
-				close $fh;
-				my @filtered = grep { $_->{name} eq "buildtype" } @$json;
-				scalar @filtered == 0 ? "debug" : $filtered[0]->{value};
-			};
+					my $file = "$pixiewood_dirname/bin-$arch/meson-info/intro-buildoptions.json";
+					open(my $fh, "<", $file) or die("Failed to open buildoptions introspection $file: $!");
+					local $/;
+					my $json = decode_json <$fh>;
+					close $fh;
+					my @filtered = grep { $_->{name} eq "buildtype" } @$json;
+					scalar @filtered == 0 ? "debug" : $filtered[0]->{value};
+				};
 
-			$ENV{ANDROID_HOME} = $sdk;
-			chdir "$pixiewood_dirname/android" or die("Failed to enter android directory: $!");
-			exec ("./gradlew",
-			      ($buildtype eq "release" or $buildtype eq "minsize") ? "assembleRelease" : "assembleDebug"
-			) or die "exec failed: $!";
+				$ENV{ANDROID_HOME} = $sdk;
+				chdir "$pixiewood_dirname/android" or die("Failed to enter android directory: $!");
+				exec ("./gradlew",
+				      ($buildtype eq "release" or $buildtype eq "minsize") ? "assembleRelease" : "assembleDebug"
+				) or die "exec failed: $!";
+			}
+
+			waitpid($gradle, 0);
+			die "Gradle build failed" unless $? == 0;
 		}
-
-		waitpid($gradle, 0);
-		die "Gradle build failed" unless $? == 0;
 	}
 );
 
