@@ -46,7 +46,7 @@ my $ninja = "ninja";
 
 my $studio_dir = "/opt/android-studio/";
 my $sdk;
-my $toolchain; # TODO: automatically determine good toolchain
+my $toolchain;
 
 my $dir = ".";
 my $release = 0;
@@ -310,10 +310,10 @@ my %actions = (
 			           "--cross-file", "$pixiewood_dirname/toolchain.cross",
 			           "--cross-file", "$asset_dir/prepare/arch/$arch.cross",
 			           "--cross-file", "$asset_dir/prepare/android.cross",
-				   "--buildtype", $release ? "release" : "debug",
-				   $release ? "--strip" : (),
+			           "--buildtype", $release ? "release" : "debug",
+			           $release ? "--strip" : (),
 			           @options,
-			          "$pixiewood_dirname/bin-$arch", ".");
+			           "$pixiewood_dirname/bin-$arch", ".");
 			$configures->launch(@cmd);
 		}
 		die "Configuration failed, see logs for more info" unless $configures->wait();
@@ -647,7 +647,7 @@ my %actions = (
 
 				$ENV{ANDROID_HOME} = $sdk;
 				chdir "$pixiewood_dirname/android" or die("Failed to enter android directory: $!");
-				exec ("./gradlew",
+				exec ("./gradlew",  "--no-daemon",
 				      ($buildtype eq "release" or $buildtype eq "minsize") ? "assembleRelease" : "assembleDebug"
 				) or die "exec failed: $!";
 			}
