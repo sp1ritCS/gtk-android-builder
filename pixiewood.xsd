@@ -1,0 +1,142 @@
+<?xml version="1.0"?>
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" targetNamespace="https://sp1rit.arpa/pixiewood/" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:htmx="http://www.w3.org/1999/xhtml">
+	<xs:element name="app">
+		<xs:complexType>
+			<xs:all>
+				<xs:element name="metainfo">
+					<xs:annotation>
+						<xs:documentation>
+							This element should containg the apppstream metadata of your application. The recommended way of
+							doing this by including <htmx:tt>xmlns:xi="http://www.w3.org/2001/XInclude"</htmx:tt> and using
+							<htmx:tt>&lt;xi:include href="build://x86_64/path/to/manifest.xml" parse="xml"/&gt;</htmx:tt>
+						</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="style">
+					<xs:complexType>
+						<xs:all>
+							<xs:element name="theme">
+								<xs:complexType>
+									<xs:attribute name="name" type="xs:string"/>
+									<xs:attribute name="accent">
+										<xs:simpleType>
+											<xs:restriction base="xs:token">
+												<xs:pattern value="#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?"/>
+											</xs:restriction>
+										</xs:simpleType>
+									</xs:attribute>
+								</xs:complexType>
+							</xs:element>
+							<xs:element name="icon">
+								<xs:complexType>
+									<xs:choice maxOccurs="unbounded">
+										<xs:element name="drawable">
+											<xs:complexType>
+												<xs:attribute name="target">
+													<xs:simpleType>
+														<xs:restriction base="xs:string">
+															<xs:pattern value="foreground|background|monochrome"/>
+														</xs:restriction>
+													</xs:simpleType>
+												</xs:attribute>
+												<xs:attribute name="scale" type="xs:decimal"/>
+												<xs:attribute name="type">
+													<xs:simpleType>
+														<xs:restriction base="xs:token">
+															<xs:pattern value="svg|avd"/>
+														</xs:restriction>
+													</xs:simpleType>
+												</xs:attribute>
+												<xs:attribute name="path" type="xs:string"/>
+											</xs:complexType>
+										</xs:element>
+										<xs:element name="color"/>
+									</xs:choice>
+									<xs:attribute name="type">
+										<xs:simpleType>
+											<xs:restriction base="xs:token">
+												<xs:pattern value="generate"/>
+											</xs:restriction>
+										</xs:simpleType>
+									</xs:attribute>
+								</xs:complexType>
+							</xs:element>
+						</xs:all>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="dependencies" minOccurs="0">
+					<xs:complexType>
+						<xs:annotation>
+							<xs:documentation>List of the dependencies you wish to explicitly include</xs:documentation>
+						</xs:annotation>
+						<xs:sequence>
+							<xs:any processContents="lax" minOccurs="0" maxOccurs="unbounded">
+								<xs:annotation>
+									<xs:documentation>
+										The name of the dependency to include, optionally with the <htmx:tt>revision</htmx:tt>
+										attribute to specify a specific revision.<htmx:br/>
+										To add additional patches to a dependency, you may add
+										<htmx:tt>&lt;patch&gt;<htmx:i>name</htmx:i>&lt;/patch&gt;</htmx:tt> as a child element
+										to the dependency element for each patch you want to add.
+									</xs:documentation>
+								</xs:annotation>
+							</xs:any>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="build">
+					<xs:complexType>
+						<xs:all>
+							<xs:element name="configure-options" minOccurs="0">
+								<xs:complexType>
+									<xs:annotation>
+										<xs:documentation>
+											Additional configure options that are passed to <htmx:tt>meson setup</htmx:tt>
+										</xs:documentation>
+									</xs:annotation>
+									<xs:sequence>
+										<xs:element name="option" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+							<xs:element name="architectures" minOccurs="0">
+								<xs:complexType>
+									<xs:annotation>
+										<xs:documentation>
+											Allows to Restricts the target architectures the application gets built for
+										</xs:documentation>
+									</xs:annotation>
+									<xs:sequence>
+										<xs:element name="arch" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+									</xs:sequence>
+									<xs:attribute name="mode">
+										<xs:simpleType>
+											<xs:restriction base="xs:string">
+												<xs:pattern value="(white|black)list"/>
+											</xs:restriction>
+										</xs:simpleType>
+									</xs:attribute>
+								</xs:complexType>
+							</xs:element>
+						</xs:all>
+						<xs:attribute name="target" type="xs:string">
+							<xs:annotation>
+								<xs:documentation>The meson target name of your application</xs:documentation>
+							</xs:annotation>
+						</xs:attribute>
+						<xs:attribute name="java-sources" type="xs:string">
+							<xs:annotation>
+								<xs:documentation>
+									Specify an alternative path to the GTK Android Java sources. Unless you know what you are doing,
+									you should probably not specify this.
+								</xs:documentation>
+							</xs:annotation>
+						</xs:attribute>
+					</xs:complexType>
+				</xs:element>
+			</xs:all>
+		</xs:complexType>
+	</xs:element>
+
+	<xs:element name="patch" type="xs:string"/>
+</xs:schema>
