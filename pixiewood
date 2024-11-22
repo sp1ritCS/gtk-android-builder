@@ -19,11 +19,12 @@
 use strict;
 use warnings;
 use Archive::Tar;
+use Cwd qw(abs_path);
 use File::Basename qw(fileparse);
 use File::Copy qw(copy);
 use File::Find qw(find);
 use File::Path qw(make_path);
-use File::Spec::Functions qw(catfile rel2abs);
+use File::Spec::Functions qw(catfile);
 use Getopt::Long qw(GetOptions);
 use Glib;
 use Glib::Object::Introspection;
@@ -39,7 +40,7 @@ Glib::Object::Introspection->setup(basename => 'AppStream', version => '1.0', pa
 
 my $version = "0";
 my $pixiewood_dirname = ".pixiewood";
-my (undef, $asset_dir) = fileparse(rel2abs(__FILE__)); # TODO: readlink
+my (undef, $asset_dir) = fileparse(abs_path(__FILE__));
 
 my $meson = "meson";
 my $ninja = "ninja";
