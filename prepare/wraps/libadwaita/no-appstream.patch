@@ -946,26 +946,3 @@ Index: demo/data/meson.build
 IDEA additional info:
 Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 <+>UTF-8
-===================================================================
-diff --git a/demo/data/meson.build b/demo/data/meson.build
---- a/demo/data/meson.build	(revision 42b47f0438fc2b24910c58e00bd2bd970b499379)
-+++ b/demo/data/meson.build	(date 1726341703583)
-@@ -35,18 +35,6 @@
- appdata_config.set('BUILD_VERSION', meson.project_version())
- appdata_config.set('BUILD_DATE', today)
- 
--appstream_file = i18n.merge_file(
--  input: configure_file(
--    input: 'org.gnome.Adwaita1.Demo.metainfo.xml.in.in',
--    output: 'org.gnome.Adwaita1.Demo.metainfo.xml.in',
--    configuration: appdata_config
--  ),
--  output: 'org.gnome.Adwaita1.Demo.metainfo.xml',
--  po_dir: '../../po',
--  install: true,
--  install_dir: datadir / 'metainfo'
--)
--
- appstreamcli = find_program('appstreamcli', required: false)
- if appstreamcli.found()
-   test('Validate appstream file', appstreamcli,
