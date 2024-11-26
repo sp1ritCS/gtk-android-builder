@@ -146,7 +146,15 @@ sub path_from_uri {
 		return catfile ".", $path;
 	} elsif ($dir eq "build") {
 		my ($arch,$path) = $path =~ m/^\/*([a-z0-9_]*)\/(.*)$/;
-		return catfile ".", $pixiewood_dirname, "bin-$arch", $path;
+		my $res = catfile ".", $pixiewood_dirname, "bin-$arch", $path;
+		do {
+			# Run build:// URL as target in case it is generated during build
+			my @cmd = ($ninja,
+			           "-C", "$pixiewood_dirname/bin-$arch",
+			           "$path");
+			run \@cmd, '>', "/dev/null", '2>&1';
+		} if -e catfile ".", $pixiewood_dirname, "bin-$arch", "build.ninja";
+		return $res;
 	}
 	return $path;
 };
