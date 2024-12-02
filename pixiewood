@@ -24,7 +24,7 @@ use File::Basename qw(fileparse);
 use File::Copy qw(copy);
 use File::Find qw(find);
 use File::Path qw(make_path);
-use File::Spec::Functions qw(catfile);
+use File::Spec::Functions qw(catfile rel2abs);
 use Getopt::Long qw(GetOptions);
 use Glib;
 use Glib::Object::Introspection;
@@ -38,20 +38,14 @@ use XML::LibXSLT;
 
 Glib::Object::Introspection->setup(basename => 'AppStream', version => '1.0', package => 'As');
 
+Getopt::Long::Configure("default", "require_order", "bundling");
+
 my $version = "0";
 my $pixiewood_dirname = ".pixiewood";
 my (undef, $asset_dir) = fileparse(abs_path(__FILE__));
-
-my $meson = "meson";
 my $ninja = "ninja";
 
-my $studio_dir = "/opt/android-studio/";
-my $sdk;
-my $toolchain;
-
 my $dir = ".";
-my $release = 0;
-my $skip_gradle = 0;
 my $verbose = 0;
 
 my $help = 0;
@@ -62,26 +56,26 @@ sub usage {
 	print STDERR "Error: $error\n" if $error;
 
 	print << "EOF";
-Usage: $0 [options] <action> <pixiewood manifest>
+Usage: $0 [options] <action>
 
-Options:
-  -a, --android-studio-dir <DIR>  Location where Android Studio is installed
-  -s, --sdk <DIR>                 Install location of the Android SDK
-  -t, --toolchain <DIR>           Install location of the Android NDK (typically within the SDK)
-  --meson <EXECUTABLE>            Specify the executable for the meson buildsystem
-  --ninja <EXECUTABLE             Specify the executable for the ninja buildsystem
+Global Options:
   -C, --change-dir <DIR>          The project source root of the project to build
-  --release                       Create a release instead of debug build
-  --skip-gradle                   Skip the building of the Android Package
   -v, --verbose                   Enable verbose output
   --help                          Display this help message
   -V, --version                   Display version and debug information
 
 Actions:
-  prepare                         Prepare the project for building with GTK Android. This includes
+  prepare [options] <manifest>    Prepare the project for building with GTK Android. This includes
                                   patching the subprojects and configuring the build directories.
+    --release                       Create a release instead of debug build
+    -a, --android-studio-dir <DIR>  Location where Android Studio is installed
+    -s, --sdk <DIR>                 Install location of the Android SDK
+    -t, --toolchain <DIR>           Install location of the Android NDK (typically within the SDK)
+    --meson <EXECUTABLE>            Specify the executable for the meson buildsystem
+
   generate                        Generate an Android application skeleton based on the manifest.
-  build                           Build the project and wrap it into and Android package.
+
+  build [--skip-gradle]           Build the project and wrap it into and Android package.
 EOF
 	exit 1 if $error;
 	exit 0;
@@ -103,17 +97,10 @@ EOF
 }
 
 GetOptions(
-	"android-studio-dir|a=s" => \$studio_dir,
-	"sdk|s=s" => \$sdk,
-	"toolchain|t=s" => \$toolchain,
-	"meson=s" => \$meson,
-	"ninja=s" => \$ninja,
 	"change-dir|C=s" => \$dir,
-	"release" => \$release,
-	"skip-gradle" => \$skip_gradle,
 	"verbose|v" => \$verbose,
 	"help" => \$help,
-	"version" => \$cversion,
+	"version|V" => \$cversion,
 ) or usage("Incorrect usage of command line options");
 
 usage() if $help;
@@ -122,21 +109,10 @@ do_version() if $cversion;
 my $action = shift @ARGV;
 usage("Action not specified") unless defined $action;
 
-my $app_path = shift @ARGV;
-usage("Manifest not specified") unless defined $app_path;
-usage("Android SDK directory not specified") unless defined $sdk;
-$toolchain = do {
-	opendir(my $dir, "$sdk/ndk") or die "Failed to open NDK toolchain dir: $!";
-	my $newest = reduce { As::vercmp ($a, $b, "none") > 0 ? $a : $b } grep { !/^\./ } readdir($dir);
-	closedir($dir);
-	defined $newest ? catfile $sdk, "ndk", $newest : undef
-} unless defined $toolchain;
-usage("Unable to detect Android NDK (Toolchain), try specifing it") unless defined $toolchain;
-
+my $original_dir = abs_path '.';
 my $pixiewood_dir = catfile($dir, $pixiewood_dirname);
 make_path($pixiewood_dir);
 chdir $dir or die("Failed to enter source directory: $!");
-
 
 sub path_from_uri {
 	my $uri = shift;
@@ -193,28 +169,58 @@ XML::LibXSLT->register_function("https://sp1rit.arpa/pixiewood/", "vermax", sub 
 	reduce { As::vercmp ($a, $b, "none") > 0 ? $a : $b } map { $_->value } shift->get_nodelist
 });
 
-my $app_doc = $parser->load_xml(location => $app_path, xinclude => 1);
-
-my $appx = XML::LibXML::XPathContext->new($app_doc);
-$appx->registerNs("pw", "https://sp1rit.arpa/pixiewood/");
-$appx->registerNs("meta", "https://specifications.freedesktop.org/metainfo/1.0");
-
-my $arches = Set::Scalar->new("aarch64", "armv7a", "i686", "x86_64");
-my $architectures = $appx->findnodes("/pw:app/pw:build/pw:architectures")->shift;
-if (defined $architectures) {
-	my @listed = map { $_->textContent } $appx->findnodes("pw:arch", $architectures);
-	my $listed_arches = Set::Scalar->new(@listed);
-	
-	my $archtype = $architectures->getAttribute("mode");
-	if (not defined $archtype or $archtype eq "whitelist") {
-		$arches = $arches->intersection($listed_arches);
-	} elsif ($archtype eq "blacklist") {
-		$arches = $arches->difference($listed_arches);
-	} else {
-		die("Unknown architectures modes: $archtype");
-	}
+sub xpc_for_manifest {
+	my $appx = XML::LibXML::XPathContext->new(shift);
+	$appx->registerNs("pw", "https://sp1rit.arpa/pixiewood/");
+	$appx->registerNs("meta", "https://specifications.freedesktop.org/metainfo/1.0");
+	return $appx;
 }
-die "Can't build for no architectures" if $arches->size == 0;
+
+sub read_configuration {
+	print "Reading configuration\n" if $verbose;
+	my $cfg = Glib::KeyFile->new;
+	$cfg->load_from_file("$pixiewood_dirname/pixiewood.ini", "none");
+
+	my $app_path = $cfg->get_string("pixiewood", "manifest");
+	my $studio_dir = $cfg->get_string("pixiewood", "android-studio-dir");
+	my $sdk = $cfg->get_string("pixiewood", "android-sdk");
+	my $toolchain = $cfg->get_string("pixiewood", "android-ndk");
+	my $meson = $cfg->get_string("pixiewood", "meson-bin");
+	my $release = $cfg->get_boolean("pixiewood", "release");
+
+	my $app_doc = $parser->load_xml(location => $app_path, xinclude => 1);
+
+	return (xpc_for_manifest($app_doc), {
+		'manifest' => $app_doc,
+		'studio-dir' => $studio_dir,
+		'android-sdk' => $sdk,
+		'android-ndk' => $toolchain,
+		'meson' => $meson,
+		'release' => $release
+	});
+}
+
+sub get_target_arches {
+	my $appx = shift;
+
+	my $arches = Set::Scalar->new("aarch64", "armv7a", "i686", "x86_64");
+	my $architectures = $appx->findnodes("/pw:app/pw:build/pw:architectures")->shift;
+	if (defined $architectures) {
+		my @listed = map { $_->textContent } $appx->findnodes("pw:arch", $architectures);
+		my $listed_arches = Set::Scalar->new(@listed);
+	
+		my $archtype = $architectures->getAttribute("mode");
+		if (not defined $archtype or $archtype eq "whitelist") {
+			$arches = $arches->intersection($listed_arches);
+		} elsif ($archtype eq "blacklist") {
+			$arches = $arches->difference($listed_arches);
+		} else {
+			die("Unknown architectures modes: $archtype");
+		}
+	}
+	die "Can't build for no architectures" if $arches->size == 0;
+	return $arches;
+}
 
 {
 	package ParallelRunner;
@@ -267,6 +273,43 @@ die "Can't build for no architectures" if $arches->size == 0;
 
 my %actions = (
 	"prepare" => sub {
+		my $meson = "meson";
+
+		my $studio_dir = "/opt/android-studio/";
+		my $sdk;
+		my $toolchain;
+
+		my $release = 0;
+
+		GetOptions(
+			"android-studio-dir|a=s" => \$studio_dir,
+			"sdk|s=s" => \$sdk,
+			"toolchain|t=s" => \$toolchain,
+			"meson=s" => \$meson,
+			"release" => \$release,
+		) or usage("Incorrect usage of command line options");
+
+		my $app_path = rel2abs(shift @ARGV, $original_dir);
+		usage("Manifest not specified") unless defined $app_path;
+		usage("Android SDK directory not specified") unless defined $sdk;
+
+		$meson = rel2abs($meson, $original_dir) if $meson =~ /^\.{1,2}\//;
+		$studio_dir = rel2abs($studio_dir, $original_dir);
+		$sdk = rel2abs($sdk, $original_dir);
+		$toolchain = rel2abs($toolchain, $original_dir) if defined $toolchain;
+
+		$toolchain = do {
+			opendir(my $dir, "$sdk/ndk") or die "Failed to open NDK toolchain dir: $!";
+			my $newest = reduce { As::vercmp ($a, $b, "none") > 0 ? $a : $b } grep { !/^\./ } readdir($dir);
+			closedir($dir);
+			defined $newest ? catfile $sdk, "ndk", $newest : undef
+		} unless defined $toolchain;
+		usage("Unable to detect Android NDK (Toolchain), try specifing it") unless defined $toolchain;
+
+		my $app_doc = $parser->load_xml(location => $app_path, xinclude => 1);
+		my $appx = xpc_for_manifest $app_doc;
+		my $arches = get_target_arches $appx;
+
 		print "Generating toolchain crossfile\n" if $verbose;
 		my $tcc = Glib::KeyFile->new;
 		$tcc->set_string("constants", "toolchain", "'$toolchain/toolchains/llvm/prebuilt/linux-x86_64/'");
@@ -326,8 +369,23 @@ my %actions = (
 			$configures->launch(@cmd);
 		}
 		die "Configuration failed, see logs for more info" unless $configures->wait();
+
+		print "Writing configuration\n" if $verbose;
+		my $cfg = Glib::KeyFile->new;
+		$cfg->set_string("pixiewood", "manifest", $app_path);
+		$cfg->set_string("pixiewood", "android-studio-dir", $studio_dir);
+		$cfg->set_string("pixiewood", "android-sdk", $sdk);
+		$cfg->set_string("pixiewood", "android-ndk", $toolchain);
+		$cfg->set_string("pixiewood", "meson-bin", $meson);
+		$cfg->set_boolean("pixiewood", "release", $release);
+		open my $cfgfh, ">", "$pixiewood_dirname/pixiewood.ini" or die("Failed to open build configuration for writing");
+		print $cfgfh $cfg->to_data;
+		close $cfgfh;
 	},
 	"generate" => sub {
+		our ($appx, $cfg) = read_configuration;
+		my $arches = get_target_arches $appx;
+
 		my $id = $appx->findvalue("/pw:app/pw:metainfo/meta:component/meta:id[not(\@xml:lang)]");
 		die("Unable to find component id in manifest, if you are using XInclude ensure that the path is correct") unless $id;
 		my @id_parts = split /\./, $id;
@@ -393,7 +451,7 @@ my %actions = (
 		for my ($stylesheet_file, $dest) (@stylesheets) {
 			my $style_doc = XML::LibXML->load_xml(location => catfile("$asset_dir/generate", $stylesheet_file), no_cdata => 1);
 			my $stylesheet = $xslt->parse_stylesheet($style_doc);
-			my $results = $stylesheet->transform($app_doc, XML::LibXSLT::xpath_to_string(libname => $libname, abis => $abis));
+			my $results = $stylesheet->transform($cfg->{'manifest'}, XML::LibXSLT::xpath_to_string(libname => $libname, abis => $abis));
 
 			my $fh = create_handle $dest;
 			$stylesheet->output_fh($results, $fh);
@@ -404,7 +462,7 @@ my %actions = (
 		do {
 			my $lang_doc = XML::LibXML->load_xml(location => catfile("$asset_dir/generate", "langs.xsl"), no_cdata => 1);
 			my $langsheet = $xslt->parse_stylesheet($lang_doc);
-			my $langres = $langsheet->transform($app_doc);
+			my $langres = $langsheet->transform($cfg->{'manifest'});
 			my $langs = $langsheet->output_as_chars($langres);
 
 			my $strings_doc = XML::LibXML->load_xml(location => catfile("$asset_dir/generate", "strings.xsl"), no_cdata => 1);
@@ -413,7 +471,7 @@ my %actions = (
 			open my $fh, '<', \$langs or die "Could not open string: $!";
 			while (my $lang = <$fh>) {
 				chomp $lang;
-				my $results = $stringssheet->transform($app_doc, XML::LibXSLT::xpath_to_string(lang => "$lang"));
+				my $results = $stringssheet->transform($cfg->{'manifest'}, XML::LibXSLT::xpath_to_string(lang => "$lang"));
 
 				my $ofh = create_handle "app/src/main/res/values-$lang/strings.xml";
 				$stringssheet->output_fh($results, $ofh);
@@ -445,7 +503,7 @@ my %actions = (
 						}
 						close $fh;
 					} elsif ($type eq "svg") {
-						$ENV{'STUDIO_DIR'} = $studio_dir;
+						$ENV{'STUDIO_DIR'} = $cfg->{'studio-dir'};
 						my $path = path_from_uri $drawable->getAttribute("path") or die("Drawable is missing path");
 						my @cmd = (catfile("$asset_dir/generate", "Svg2Avd"), $path);
 
@@ -567,11 +625,19 @@ my %actions = (
 		# A small hack to let pixiewood build applications within the gtk codebase
 		my $java_sources = $appx->findvalue('//pw:app/pw:build/@java-sources');
 		$java_sources = "subprojects/gtk/gdk/android/glue/java/" unless $java_sources;
-		force_symlink abs_path(catfile($java_sources, "org/gtk/android")), catfile($output_dir, "app/src/main/java/org/gtk/android") or die "Failed to symlink java sources: $!";
+		force_symlink rel2abs(catfile($java_sources, "org/gtk/android")), catfile($output_dir, "app/src/main/java/org/gtk/android") or die "Failed to symlink java sources: $!";
 
 		force_symlink "../../../../root/lib", catfile($output_dir, "app/src/main/jniLibs") or die "Failed to symlink libraries: $!";
 	},
 	"build" => sub {
+		my $skip_gradle = 0;
+		GetOptions(
+			"skip-gradle" => \$skip_gradle,
+		) or usage("Incorrect usage of command line options");
+
+		my ($appx, $cfg) = read_configuration;
+		my $arches = get_target_arches $appx;
+
 		my $num = $arches->size;
 
 		my $parallel = `nproc`;
@@ -589,9 +655,9 @@ my %actions = (
 
 		# Lets not run the install in parallel
 		while (defined(my $arch = $arches->each)) {
-			my @cmd = ($meson, "install",
+			my @cmd = ($cfg->{'meson'}, "install",
 			           "-C", "$pixiewood_dirname/bin-$arch",
-			           "--destdir", abs_path("$pixiewood_dirname/root"),
+			           "--destdir", rel2abs("$pixiewood_dirname/root"),
 			           "--tags", "runtime");
 			run \@cmd or die('Failed to install files');
 		}
@@ -641,23 +707,10 @@ my %actions = (
 			die "fork failed: $!" unless defined $gradle;
 
 			if ($gradle == 0) {
-				my $buildtype = do {
-					my $arch = $arches->each;
-					$arches->size; # reset the iterator
-
-					my $file = "$pixiewood_dirname/bin-$arch/meson-info/intro-buildoptions.json";
-					open(my $fh, "<", $file) or die("Failed to open buildoptions introspection $file: $!");
-					local $/;
-					my $json = decode_json <$fh>;
-					close $fh;
-					my @filtered = grep { $_->{name} eq "buildtype" } @$json;
-					scalar @filtered == 0 ? "debug" : $filtered[0]->{value};
-				};
-
-				$ENV{ANDROID_HOME} = $sdk;
+				$ENV{ANDROID_HOME} = $cfg->{'android-sdk'};
 				chdir "$pixiewood_dirname/android" or die("Failed to enter android directory: $!");
 				exec ("./gradlew",  "--no-daemon",
-				      ($buildtype eq "release" or $buildtype eq "minsize") ? "assembleRelease" : "assembleDebug"
+				      $cfg->{'release'} ? "assembleRelease" : "assembleDebug"
 				) or die "exec failed: $!";
 			}
 
