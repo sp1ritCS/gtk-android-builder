@@ -14,8 +14,7 @@ make install
 ```
 
 ## Usage
-
-There's a C example:
+The process of build Android app package is as following:
 
 ```sh
 # Generate an Android application skeleton
