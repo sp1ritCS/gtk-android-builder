@@ -2,8 +2,8 @@
 common_flags = []
 
 [binaries]
-c          = toolchain / 'bin' / arch+'-linux-android31-clang'
-cpp        = toolchain / 'bin' / arch+'-linux-android31-clang++'
+c          = toolchain / 'bin' / arch+'-linux-'+platform+'31-clang'
+cpp        = toolchain / 'bin' / arch+'-linux-'+platform+'31-clang++'
 ar         = toolchain / 'bin/llvm-ar'
 as         = toolchain / 'bin/llvm-as'
 ranlib     = toolchain / 'bin/llvm-ranlib'

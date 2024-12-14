@@ -1,6 +1,7 @@
 [constants]
 arch = 'aarch64'
 abi = 'arm64-v8a'
+platform = 'android'
 
 [host_machine]
 cpu_family = 'aarch64'

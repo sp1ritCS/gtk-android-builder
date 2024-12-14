@@ -1,6 +1,7 @@
 [constants]
 arch = 'armv7a'
 abi = 'armeabi-v7a'
+platform = 'androideabi'
 
 [host_machine]
 cpu_family = 'arm'
