@@ -3,6 +3,10 @@ arch = 'armv7a'
 abi = 'armeabi-v7a'
 platform = 'androideabi'
 
+[pixman:project options]
+# this is a bad hack, but I did't want to change the toolchain.cross
+cpu-features-path = toolchain / '../../../../sources/android/cpufeatures/'
+
 [host_machine]
 cpu_family = 'arm'
 cpu = 'armv7'
