@@ -203,7 +203,7 @@ sub read_configuration {
 sub get_target_arches {
 	my $appx = shift;
 
-	my $arches = Set::Scalar->new("aarch64", "armv7a", "i686", "x86_64");
+	my $arches = Set::Scalar->new("aarch64", "x86_64");
 	my $architectures = $appx->findnodes("/pw:app/pw:build/pw:architectures")->shift;
 	if (defined $architectures) {
 		my @listed = map { $_->textContent } $appx->findnodes("pw:arch", $architectures);
