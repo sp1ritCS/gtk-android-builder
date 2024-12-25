@@ -24,7 +24,14 @@ To then build the application, follow these steps:
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <app xmlns="https://sp1rit.arpa/pixiewood/" xmlns:xi="http://www.w3.org/2001/XInclude">
-	<metainfo>
+	<metainfo vercalc="count">
+	<!--
+		vercalc determines which mechanism is used for converting the application version into an integer.
+		The available modes are: 'count' (default), which just counts the number of releases listed,
+		'sem121010' which calculates (major << 20) + (minor << 10) + (patch) but requires the versions to follow
+		semantic versioning and 'identity' which only works if you use integer versions.
+	-->
+
 		<!--
 			Ensure that the appstream manifest has xmlns="https://specifications.freedesktop.org/metainfo/1.0"
 			and that {arch} is listed in /pw:app/pw:build/pw:architectures.

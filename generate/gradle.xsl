@@ -28,9 +28,21 @@ android {
     defaultConfig {
         applicationId "<xsl:value-of select="$package" />"
         minSdk 31
-        targetSdk 34
+	targetSdk 34
+<xsl:variable name="version" select="pw:vermax(//pw:metainfo//meta:component//meta:releases//meta:release//@version)" />
+<xsl:variable name="vercalc" select="pw:metainfo/@vercalc" />
+<xsl:choose>
+	<xsl:when test="$vercalc = 'sem121010'">
+        versionCode <xsl:value-of select="pw:semver2code($version)" />
+	</xsl:when>
+	<xsl:when test="$vercalc = 'identity'">
+        versionCode <xsl:value-of select="$version" />
+	</xsl:when>
+	<xsl:otherwise>
         versionCode <xsl:value-of select="count(pw:metainfo/meta:component/meta:releases/meta:release)" />
-        versionName "<xsl:value-of select='pw:vermax(//pw:metainfo//meta:component//meta:releases//meta:release//@version)'/>"
+	</xsl:otherwise>
+</xsl:choose>
+        versionName "<xsl:value-of select='$version'/>"
 
         multiDexEnabled false
 

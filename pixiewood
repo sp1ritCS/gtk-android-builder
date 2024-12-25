@@ -168,6 +168,11 @@ $parser->input_callbacks($xml_protos);
 XML::LibXSLT->register_function("https://sp1rit.arpa/pixiewood/", "vermax", sub {
 	reduce { As::vercmp ($a, $b, "none") > 0 ? $a : $b } map { $_->value } shift->get_nodelist
 });
+XML::LibXSLT->register_function("https://sp1rit.arpa/pixiewood/", "semver2code", sub {
+	my $semver = shift;
+	$semver =~ m/(\d+)(?:\.(\d+)(?:\.(\d+))?)?/ or die "Failed to match semver: $semver";
+	($1 << 20) + (($2 or 0) << 10) + ($3 or 0)
+});
 
 sub xpc_for_manifest {
 	my $appx = XML::LibXML::XPathContext->new(shift);

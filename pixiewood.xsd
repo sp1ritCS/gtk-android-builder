@@ -4,13 +4,25 @@
 		<xs:complexType>
 			<xs:all>
 				<xs:element name="metainfo">
-					<xs:annotation>
-						<xs:documentation>
-							This element should containg the apppstream metadata of your application. The recommended way of
-							doing this by including <htmx:tt>xmlns:xi="http://www.w3.org/2001/XInclude"</htmx:tt> and using
-							<htmx:tt>&lt;xi:include href="build://x86_64/path/to/manifest.xml" parse="xml"/&gt;</htmx:tt>
-						</xs:documentation>
-					</xs:annotation>
+					<xs:complexType>
+						<xs:annotation>
+							<xs:documentation>
+								This element should containg the apppstream metadata of your application. The recommended way of
+								doing this by including <htmx:tt>xmlns:xi="http://www.w3.org/2001/XInclude"</htmx:tt> and using
+								<htmx:tt>&lt;xi:include href="build://x86_64/path/to/manifest.xml" parse="xml"/&gt;</htmx:tt>
+							</xs:documentation>
+						</xs:annotation>
+						<xs:sequence>
+							<xs:any processContents="lax" minOccurs="0" maxOccurs="1"/>
+						</xs:sequence>
+						<xs:attribute name="vercalc">
+							<xs:simpleType>
+								<xs:restriction base="xs:string">
+									<xs:pattern value="(count|sem121010|identity)"/>
+								</xs:restriction>
+							</xs:simpleType>
+						</xs:attribute>
+					</xs:complexType>
 				</xs:element>
 				<xs:element name="style">
 					<xs:complexType>
