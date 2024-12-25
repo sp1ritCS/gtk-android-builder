@@ -26,7 +26,7 @@
 			>
 				<activity android:name="org.gtk.android.ToplevelActivity"
 					android:configChanges="density|orientation|screenLayout|screenSize|touchscreen|uiMode"
-					android:screenOrientation="user"
+					android:windowSoftInputMode="adjustResize"
 					android:launchMode="standard"
 					android:resizeableActivity="true"
 					android:immersive="true"
@@ -37,6 +37,17 @@
 						<action android:name="android.intent.action.MAIN" />
 						<category android:name="android.intent.category.LAUNCHER" />
 					</intent-filter>
+					<xsl:for-each select="pw:metainfo/meta:component/meta:provides/meta:mediatype | pw:metainfo/meta:component/meta:mimetypes/meta:mimetype">
+						<intent-filter>
+							<action android:name="android.intent.action.VIEW"/>
+							<!-- if mime is editable: action.EDIT -->
+							<category android:name="android.intent.category.DEFAULT"/>
+							<!-- if should be browsable: category.BROWSABLE + scheme http+https -->
+							<data android:scheme="content"/>
+							<data android:scheme="file"/>
+							<data android:mimeType="{.}" />
+						</intent-filter>
+					</xsl:for-each>
 				</activity>
 			</application>
 			<uses-permission android:name="android.permission.REORDER_TASKS"/>
