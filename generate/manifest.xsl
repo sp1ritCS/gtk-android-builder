@@ -38,11 +38,14 @@
 						<category android:name="android.intent.category.LAUNCHER" />
 					</intent-filter>
 					<xsl:for-each select="pw:metainfo/meta:component/meta:provides/meta:mediatype | pw:metainfo/meta:component/meta:mimetypes/meta:mimetype">
+						<xsl:variable name="actions" select="str:split(@actions, '|')" />
 						<intent-filter>
 							<action android:name="android.intent.action.VIEW"/>
-							<!-- if mime is editable: action.EDIT -->
+							<xsl:if test="boolean($actions[. = 'edit'])">
+								<action android:name="android.intent.action.EDIT"/>
+							</xsl:if>
 							<category android:name="android.intent.category.DEFAULT"/>
-							<!-- if should be browsable: category.BROWSABLE + scheme http+https -->
+							<!-- TODO: how to do browsable intents?: category.BROWSABLE + scheme http+https -->
 							<data android:scheme="content"/>
 							<data android:scheme="file"/>
 							<data android:mimeType="{.}" />
