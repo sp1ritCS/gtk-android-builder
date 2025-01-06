@@ -23,12 +23,12 @@ plugins {
 
 android {
     namespace '<xsl:value-of select="$package" />'
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "<xsl:value-of select="$package" />"
         minSdk 31
-	targetSdk 34
+	targetSdk 35
 <xsl:variable name="version" select="pw:vermax(//pw:metainfo//meta:component//meta:releases//meta:release//@version)" />
 <xsl:variable name="vercalc" select="pw:metainfo/@vercalc" />
 <xsl:choose>

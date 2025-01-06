@@ -22,14 +22,13 @@
 				android:roundIcon="@mipmap/ic_launcher_round"
 				android:supportsRtl="true"
 				android:theme="@style/Theme.Gtk"
-				android-tools:targetApi="34"
+				android-tools:targetApi="35"
 			>
 				<activity android:name="org.gtk.android.ToplevelActivity"
 					android:configChanges="density|orientation|screenLayout|screenSize|touchscreen|uiMode"
 					android:windowSoftInputMode="adjustResize"
 					android:launchMode="standard"
 					android:resizeableActivity="true"
-					android:immersive="true"
 					android:theme="@style/Theme.GtkSurface"
 					android:exported="true"
 				>
