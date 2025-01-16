@@ -1,16 +1,3 @@
-diff --git a/gio/gapplication.c b/gio/gapplication.c
-index 3708e81..ba26708 100644
---- a/gio/gapplication.c
-+++ b/gio/gapplication.c
-@@ -1145,7 +1145,7 @@ g_application_real_local_command_line (GApplication   *application,
-     {
-       if (n_args <= 1)
-         {
--          g_application_activate (application);
-+          //g_application_activate (application);
-           *exit_status = 0;
-         }
- 
 diff --git a/glib/gutilsprivate.h b/glib/gutilsprivate.h
 index 24c1993..966b7f7 100644
 --- a/glib/gutilsprivate.h
