@@ -9,7 +9,6 @@ as         = toolchain / 'bin/llvm-as'
 ranlib     = toolchain / 'bin/llvm-ranlib'
 ld         = toolchain / 'bin/ld'
 strip      = toolchain / 'bin/llvm-strip'
-pkg-config = '/usr/bin/pkg-config'
 
 [built-in options]
 c_args = common_flags
@@ -23,7 +22,6 @@ libdir = 'lib' / abi
 
 [properties]
 sys_root = toolchain / 'sysroot/'
-pkg_config_libdir = '@DIRNAME@/and-cfg/'
 
 [host_machine]
 system = 'android'
@@ -33,9 +31,16 @@ default_library = 'shared'
 
 [glib:project options]
 tests = false
+dtrace = 'disabled'
+systemtap = 'disabled'
+sysprof = 'disabled'
 
 [cairo:project options]
 tests = 'disabled'
+
+[fribidi:project options]
+bin = false
+tests = false
 
 [harfbuzz:project options]
 tests = 'disabled'
@@ -49,6 +54,8 @@ builtin_loaders = ['all']
 [gtk:project options]
 android-backend = true
 introspection = 'disabled'
+# disabled until we have a mechanism to pass the JNIEnv* & Context to gstreamer
+media-gstreamer = 'disabled'
 build-demos = false
 build-testsuite = false
 build-examples = false

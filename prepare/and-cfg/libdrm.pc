@@ -1,7 +1,0 @@
-prefix=/usr
-includedir=${prefix}/include
-
-Name: libdrm
-Version: 0
-Description: Userspace interface to kernel DRM services
-Cflags: -I${includedir} -I${includedir}/drm
