@@ -31,8 +31,9 @@ default_library = 'shared'
 
 [glib:project options]
 tests = false
-dtrace = 'disabled'
-systemtap = 'disabled'
+# dtrace and systemtap are options now, for now we'll stick to the deprecated booleans to keep support for glib < 2.82
+dtrace = false
+systemtap = false
 sysprof = 'disabled'
 
 [cairo:project options]
