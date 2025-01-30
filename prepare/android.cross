@@ -31,9 +31,7 @@ default_library = 'shared'
 
 [glib:project options]
 tests = false
-# dtrace and systemtap are options now, for now we'll stick to the deprecated booleans to keep support for glib < 2.82
-dtrace = false
-systemtap = false
+# I'd like to explicitly disable dtrace and systemtap, but glib recently moved them from booleans to options and meson can't cope with both 
 sysprof = 'disabled'
 
 [cairo:project options]
