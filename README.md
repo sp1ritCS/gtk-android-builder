@@ -12,11 +12,11 @@ GTK Android Builder (codename pixiewood), is a tool designed to facilitate the p
 To build a GTK application for Android, it must meet the following preconditions:
 
 - Have an exposed `main(int, char**, char**)` entrypoint (reduced parameters are allowed) that ends up calling `g_application_run` before it returns
-- Have meson build script that uses `gnome.executable` from the [GNOME module](https://mesonbuild.com/Gnome-module.html) to define the application target
+- Have meson build script that uses `gnome.executable` from the [GNOME module](https://mesonbuild.com/Gnome-module.html) to define the application target. As of now, this requires a [forked meson](https://github.com/sp1ritCS/meson/tree/android2) (`git clone --depth 1 https://github.com/sp1ritCS/meson.git --branch android2`).
 
 To then build the application, follow these steps:
 
-1. `pixiewood prepare <manifest>`, with manifest being in format specified in [Pixiewood Format](#pixiewood-format). You might end up needing to specify paths of specific tools, check `pixiewood --help` to see what is available. Be aware that running `prepare` may overwrite preexisting wrap files in `subprojects/`.
+1. `pixiewood prepare <manifest>`, with manifest being in format specified in [Pixiewood Format](#pixiewood-format). You might end up needing to specify paths of specific tools, among them `--meson <forked/meson/meson.py>`, for others check `pixiewood --help` to see what is available. Be aware that running `prepare` may overwrite preexisting wrap files in `subprojects/`.
 2. `pixiewood generate`
 3. `pixiewood build`
 
@@ -52,7 +52,6 @@ To then build the application, follow these steps:
 		<glib revison="2.80.0">
 			<patch>hack</patch>
 		</glib>
-		<cairo/>
 		<harfbuzz/>
 		<fontconfig/>
 		<rsvg revision="librsvg-2.40">
