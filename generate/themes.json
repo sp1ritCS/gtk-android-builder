@@ -1,0 +1,31 @@
+{
+	"gtk": {
+		"light": {
+			"base": "#FFFFFFFF",
+			"bg": "#FFF6F5F4",
+			"fg": "#FF2E3436",
+			"accent": "#FF3584E4"
+		},
+		"dark": {
+			"base": "#FF2D2D2D",
+			"bg": "#FF353535",
+			"fg": "#FFEEEEEC",
+			"accent": "#FF15539E"
+		}
+	},
+	"adw": {
+		"light": {
+			"base": "#FFFFFFFF",
+			"bg": "#FFFAFAFA",
+			"fg": "#CC000000",
+			"accent": "#FF3584E4"
+		},
+		"dark": {
+			"base": "#FF1E1E1E",
+			"bg": "#FF242424",
+			"fg": "#FFFFFFFF",
+			"accent": "#FF3584E4"
+
+		}
+	}
+}

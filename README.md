@@ -39,7 +39,8 @@ To then build the application, follow these steps:
 		<xi:include href="build://{arch}/{path/to/(localized)/appstream/manifest.xml}" parse="xml"/>
 	</metainfo>
 	<style>
-		<theme name="gtk" accent="#3584e4"/>
+		<!-- Currently available themes are "gtk" & "adw" -->
+		<theme name="gtk"/>
 		<icon type="generate">
 			<drawable target="foreground" scale=".5" type="svg" path="src://{path/to/app/icon.svg}"/>
 			<!-- You can also use drawable instead of color for target="background" -->

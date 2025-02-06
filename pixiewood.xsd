@@ -30,13 +30,6 @@
 							<xs:element name="theme">
 								<xs:complexType>
 									<xs:attribute name="name" type="xs:string"/>
-									<xs:attribute name="accent">
-										<xs:simpleType>
-											<xs:restriction base="xs:token">
-												<xs:pattern value="#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?"/>
-											</xs:restriction>
-										</xs:simpleType>
-									</xs:attribute>
 								</xs:complexType>
 							</xs:element>
 							<xs:element name="icon">
