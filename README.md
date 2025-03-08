@@ -78,13 +78,13 @@ Be aware that pixiewood ships and uses `Svg2Avd`, which requires `java` in PATH 
 
 #### openSUSE
 ```sh
-# zypper in 'perl(Glib)' 'perl(Glib::Object::Introspection)' 'perl(IPC::Run)' 'perl(JSON)' 'perl(Set::Scalar)' 'perl(XML::LibXML)' 'perl(XML::LibXSLT)' 'typelib(AppStream)' 'java-17-openjdk'
+# zypper in 'perl(Glib)' 'perl(Glib::Object::Introspection)' 'perl(IPC::Run)' 'perl(JSON)' 'perl(Set::Scalar)' 'perl(XML::LibXML)' 'perl(XML::LibXSLT)' 'typelib(AppStream)' 'java-17-openjdk-devel'
 # zypper in gcc gcc-c++ glib2-devel glib2-tools libxml2-tools meson ninja sassc shaderc
 ```
 
 #### Fedora
 ```sh
-# dnf install 'perl(Archive::Tar)' 'perl(Glib)' 'perl(Glib::Object::Introspection)' 'perl(IPC::Run)' 'perl(JSON)' 'perl(Set::Scalar)' 'perl(XML::LibXML)' 'perl(XML::LibXSLT)' appstream 'java-17-openjdk'
+# dnf install 'perl(Archive::Tar)' 'perl(Glib)' 'perl(Glib::Object::Introspection)' 'perl(IPC::Run)' 'perl(JSON)' 'perl(Set::Scalar)' 'perl(XML::LibXML)' 'perl(XML::LibXSLT)' appstream 'java-17-openjdk-devel'
 # dnf install gcc gcc-c++ glib2 glib2-devel glslc libxml2 meson ninja sassc
 ```
 
