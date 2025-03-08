@@ -53,6 +53,12 @@
 				</activity>
 			</application>
 			<uses-permission android:name="android.permission.REORDER_TASKS"/>
+			<xsl:if test="pw:metainfo/meta:component/meta:requires[meta:internet='always' or meta:internet='first-run']
+			            | pw:metainfo/meta:component/meta:recommends[meta:internet='always' or meta:internet='first-run']
+			            | pw:metainfo/meta:component/meta:suggests[meta:internet='always' or meta:internet='first-run' or meta:internet='offline-only']">
+				<uses-permission android:name="android.permission.INTERNET"/>
+				<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+			</xsl:if>
 		</manifest>
 	</xsl:template>
 </xsl:stylesheet>
