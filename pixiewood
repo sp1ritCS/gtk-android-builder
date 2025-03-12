@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 # Pixiewood - GTK Android Builder
-# Copyright (C) 2024  Florian "sp1rit" <sp1rit@disroot.org>
+# Copyright (C) 2024/25  Florian "sp1rit" <sp1rit@disroot.org>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -478,7 +478,8 @@ my %actions = (
 				chomp $lang;
 				my $results = $stringssheet->transform($cfg->{'manifest'}, XML::LibXSLT::xpath_to_string(lang => "$lang"));
 
-				my $ofh = create_handle "app/src/main/res/values-$lang/strings.xml";
+				$lang =~ s/-/+/g;
+				my $ofh = create_handle "app/src/main/res/values-b+$lang/strings.xml";
 				$stringssheet->output_fh($results, $ofh);
 				close $ofh;
 			}
