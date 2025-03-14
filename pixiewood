@@ -375,6 +375,33 @@ my %actions = (
 		}
 		die "Configuration failed, see logs for more info" unless $configures->wait();
 
+		print "Producing GNOME Builder config" if $verbose;
+		my $bcfg = Glib::KeyFile->new;
+		# try to load preexisting .buildconfig, but should be fine if it didn't exist previously
+		eval { $bcfg->load_from_file(".buildconfig", "keep-comments") };
+		$bcfg->set_string("android", "name", "Android");
+		$bcfg->set_string("android", "runtime", "host");
+		$bcfg->set_string("android", "toolchain", "default");
+		do {
+			my $arch = $arches->each;
+			$arches->size; # reset the iterator
+
+			my @args = ("--cross-file", "$pixiewood_dirname/toolchain.cross",
+			            "--cross-file", "$asset_dir/prepare/arch/$arch.cross",
+			            "--cross-file", "$asset_dir/prepare/android.cross",
+			            @options);
+			# Escape commands with spaces in single quotes (and hope that they don't themselves contain single quotes)
+			# this should be replaced by Glib::shell_quote, but the Glib module seemingly doesn't provide functions
+			# and I can't import Glib via introspection without assertion failures.
+			my $opts = join(" ", map { /\s/ ? "'$_'" : $_ } @args);
+			$bcfg->set_string("android", "config-opts", $opts);
+		};
+		$bcfg->set_string("android.environment", "MESON", $meson);
+		open my $bcfgfh, ">", ".buildconfig" or die("Failed to open GNOME Builder .buildconfig for writing");
+		print $bcfgfh $bcfg->to_data;
+		close $bcfgfh;
+
+
 		print "Writing configuration\n" if $verbose;
 		my $cfg = Glib::KeyFile->new;
 		$cfg->set_string("pixiewood", "manifest", $app_path);
