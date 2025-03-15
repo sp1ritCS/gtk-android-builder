@@ -386,9 +386,9 @@ my %actions = (
 			my $arch = $arches->each;
 			$arches->size; # reset the iterator
 
-			my @args = ("--cross-file", "$pixiewood_dirname/toolchain.cross",
-			            "--cross-file", "$asset_dir/prepare/arch/$arch.cross",
-			            "--cross-file", "$asset_dir/prepare/android.cross",
+			my @args = ("--cross-file", rel2abs("$pixiewood_dirname/toolchain.cross"),
+			            "--cross-file", rel2abs("$asset_dir/prepare/arch/$arch.cross"),
+			            "--cross-file", rel2abs("$asset_dir/prepare/android.cross"),
 			            @options);
 			# Escape commands with spaces in single quotes (and hope that they don't themselves contain single quotes)
 			# this should be replaced by Glib::shell_quote, but the Glib module seemingly doesn't provide functions
