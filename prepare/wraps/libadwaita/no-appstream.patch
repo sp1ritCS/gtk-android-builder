@@ -1,3 +1,4 @@
+From: gvsbuild <wingtk@github>
 Subject: [PATCH] Remove appstream
 
 Source: https://github.com/wingtk/gvsbuild/blob/main/gvsbuild/patches/libadwaita/0001-remove-appstream-dependency.patch
@@ -786,12 +787,12 @@ diff --git a/src/adw-about-dialog.c b/src/adw-about-dialog.c
  /**
   * adw_about_dialog_get_application_icon:
   * @self: an about dialog
-@@ -3440,43 +3250,4 @@
+@@ -3440,43 +3250,5 @@
    g_object_set_valist (G_OBJECT (dialog), first_property_name, var_args);
    va_end (var_args);
  
--  adw_dialog_present (dialog, parent);
--}
+   adw_dialog_present (dialog, parent);
+ }
 -
 -/**
 - * adw_show_about_dialog_from_appdata: (skip)
@@ -829,7 +830,7 @@ diff --git a/src/adw-about-dialog.c b/src/adw-about-dialog.c
 -  va_end (var_args);
 -
 -  adw_dialog_present (dialog, parent);
- }
+-}
 Index: demo/adwaita-demo.c
 IDEA additional info:
 Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
