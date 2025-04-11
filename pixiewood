@@ -505,7 +505,7 @@ my %actions = (
 				chomp $lang;
 				my $results = $stringssheet->transform($cfg->{'manifest'}, XML::LibXSLT::xpath_to_string(lang => "$lang"));
 
-				$lang =~ s/-/+/g;
+				$lang =~ s/[-_]/+/g;
 				my $ofh = create_handle "app/src/main/res/values-b+$lang/strings.xml";
 				$stringssheet->output_fh($results, $ofh);
 				close $ofh;
