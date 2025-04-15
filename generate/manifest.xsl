@@ -10,12 +10,13 @@
 >
 	<xsl:output method="xml" encoding="UTF-8" indent="yes"/>
 
+	<xsl:param name="libname"/>
+
 	<xsl:template match="/pw:app">
 		<xsl:variable name="id" select="pw:metainfo/meta:component/meta:id[not(@xml:lang)]" />
-		<xsl:variable name="class" select="concat(str:split($id, '.')[last()], 'App')" />
 		<manifest>
 			<application
-				android:name=".{$class}"
+				android:name="org.gtk.android.RuntimeApplication"
 				android:allowBackup="true"
 				android:icon="@mipmap/ic_launcher"
 				android:label="@string/app_name"
@@ -24,6 +25,7 @@
 				android:theme="@style/Theme.Gtk"
 				android-tools:targetApi="35"
 			>
+				<meta-data android:name="gtk.android.lib_name" android:value="{$libname}" />
 				<activity android:name="org.gtk.android.ToplevelActivity"
 					android:configChanges="density|orientation|screenLayout|screenSize|touchscreen|uiMode"
 					android:windowSoftInputMode="adjustResize"
