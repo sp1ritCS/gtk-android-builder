@@ -475,8 +475,7 @@ my %actions = (
 			("settings.xsl", "settings.gradle"),
 			("gradle.xsl", "app/build.gradle"),
 			("manifest.xsl", "app/src/main/AndroidManifest.xml"),
-			("strings.xsl", "app/src/main/res/values/strings.xml"),
-			("application.xsl", catfile("app/src/main/java/", $package, "$class.java"))
+			("strings.xsl", "app/src/main/res/values/strings.xml")
 		);
 
 		my $xslt = XML::LibXSLT->new();
