@@ -318,7 +318,7 @@ index 2ee75fb68..b11bab306 100644
 @@ -18,6 +18,10 @@ option('glycin',
         description: 'Enable Glycin loader (requires glycin)',
         type: 'feature',
-        value: 'enabled')
+        value: 'auto')
 +option('svg',
 +       description: 'Enable SVG loader (requires librsvg)',
 +       type: 'feature',
