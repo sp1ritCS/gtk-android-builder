@@ -1,4 +1,4 @@
-From a895a09cb3e3e05a6c747327e6f72c8a775ee287 Mon Sep 17 00:00:00 2001
+From 4c181313e1323608e37608852a00de12e3fbe13a Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Florian=20sp1rit=E2=80=8B?= <sp1rit@disroot.org>
 Date: Sun, 20 Oct 2024 16:01:26 +0200
 Subject: [PATCH] svg: builtin svg loader
@@ -16,7 +16,7 @@ Signed-off-by: Florian "sp1rit"​ <sp1rit@disroot.org>
  create mode 100644 gdk-pixbuf/io-svg.c
 
 diff --git a/gdk-pixbuf/gdk-pixbuf-io.c b/gdk-pixbuf/gdk-pixbuf-io.c
-index bd4f51513..201b488a3 100644
+index 6859691..493af28 100644
 --- a/gdk-pixbuf/gdk-pixbuf-io.c
 +++ b/gdk-pixbuf/gdk-pixbuf-io.c
 @@ -625,6 +625,9 @@ gdk_pixbuf_io_init_builtin (void)
@@ -29,7 +29,7 @@ index bd4f51513..201b488a3 100644
  #ifdef INCLUDE_tiff
          load_one_builtin_module (tiff);
  #endif
-@@ -702,6 +705,7 @@ gdk_pixbuf_io_init (void)
+@@ -713,6 +716,7 @@ gdk_pixbuf_io_init (void)
  
  module (png);
  module (jpeg);
@@ -37,7 +37,7 @@ index bd4f51513..201b488a3 100644
  module (gif);
  module (ico);
  module (ani);
-@@ -829,6 +833,9 @@ gdk_pixbuf_load_module_unlocked (GdkPixbufModule *image_module,
+@@ -860,6 +864,9 @@ gdk_pixbuf_load_module_unlocked (GdkPixbufModule *image_module,
  #ifdef INCLUDE_qtif
          try_module (qtif,qtif);
  #endif
@@ -49,7 +49,7 @@ index bd4f51513..201b488a3 100644
          
 diff --git a/gdk-pixbuf/io-svg.c b/gdk-pixbuf/io-svg.c
 new file mode 100644
-index 000000000..90aab354a
+index 0000000..90aab35
 --- /dev/null
 +++ b/gdk-pixbuf/io-svg.c
 @@ -0,0 +1,217 @@
@@ -271,7 +271,7 @@ index 000000000..90aab354a
 +	info->license     = "LGPL";
 +}
 diff --git a/gdk-pixbuf/meson.build b/gdk-pixbuf/meson.build
-index a1c37816e..e18b72de3 100644
+index 10c1af7..a2eed0e 100644
 --- a/gdk-pixbuf/meson.build
 +++ b/gdk-pixbuf/meson.build
 @@ -34,6 +34,10 @@ loaders = {
@@ -285,7 +285,7 @@ index a1c37816e..e18b72de3 100644
    'tiff': {
      'sources': [ 'io-tiff.c' ],
      'enabled': enabled_loaders.contains('tiff'),
-@@ -144,6 +148,25 @@ if host_system == 'windows'
+@@ -143,6 +147,25 @@ if host_system == 'windows'
    gdkpixbuf_sources += gdk_pixbuf_win_res
  endif
  
@@ -312,11 +312,11 @@ index a1c37816e..e18b72de3 100644
  included_loaders_cflags = []
  included_loaders_deps = []
 diff --git a/meson_options.txt b/meson_options.txt
-index 2ee75fb68..b11bab306 100644
+index 8edec3d..d43438e 100644
 --- a/meson_options.txt
 +++ b/meson_options.txt
-@@ -18,6 +18,10 @@ option('glycin',
-        description: 'Enable Glycin loader (requires glycin)',
+@@ -22,6 +22,10 @@ option('android',
+        description: 'Enable Android ImageDecoder loader. It provides loaders for JPEG, PNG, GIF, WEBP, BMP, ICO, WBMP, and HEIF images',
         type: 'feature',
         value: 'auto')
 +option('svg',
@@ -326,15 +326,15 @@ index 2ee75fb68..b11bab306 100644
  option('others',
         description: 'Enable other loaders, which are weakly maintained',
         type: 'feature',
-@@ -25,7 +29,7 @@ option('others',
+@@ -29,7 +33,7 @@ option('others',
  option('builtin_loaders',
         description: 'Comma-separated list of loaders to build into gdk-pixbuf',
         type: 'array',
--       choices: ['all', 'none', 'windows', 'png', 'bmp', 'gif', 'ico', 'ani', 'jpeg', 'pnm', 'tiff', 'xpm', 'xbm', 'tga', 'icns', 'qtif', 'glycin'],
-+       choices: ['all', 'none', 'windows', 'png', 'bmp', 'gif', 'ico', 'ani', 'jpeg', 'pnm', 'svg', 'tiff', 'xpm', 'xbm', 'tga', 'icns', 'qtif', 'glycin'],
-        value: ['png', 'jpeg'])
+-       choices: ['default', 'all', 'none', 'windows', 'png', 'bmp', 'gif', 'ico', 'ani', 'jpeg', 'pnm', 'tiff', 'xpm', 'xbm', 'tga', 'icns', 'qtif', 'glycin'],
++       choices: ['default', 'all', 'none', 'windows', 'png', 'bmp', 'gif', 'ico', 'ani', 'jpeg', 'pnm', 'svg', 'tiff', 'xpm', 'xbm', 'tga', 'icns', 'qtif', 'glycin'],
+        value: ['default'])
  option('gtk_doc',
         description: 'Whether to generate the API reference',
 -- 
-2.49.0
+2.47.0
 
