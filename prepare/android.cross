@@ -50,6 +50,7 @@ utilities = 'disabled'
 [gdk-pixbuf:project options]
 builtin_loaders = ['all']
 glycin = 'disabled'
+documentation = false
 
 [gtk:project options]
 android-backend = true
