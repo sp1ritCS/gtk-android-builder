@@ -72,6 +72,8 @@ Actions:
     -s, --sdk <DIR>                 Install location of the Android SDK
     -t, --toolchain <DIR>           Install location of the Android NDK (typically within the SDK)
     --meson <EXECUTABLE>            Specify the executable for the meson buildsystem
+    --android-wrapper <EXECUTABLE>  Specify the executable of android-wrapper (required for
+                                    introspection)
 
   generate                        Generate an Android application skeleton based on the manifest.
 
@@ -279,6 +281,7 @@ sub get_target_arches {
 my %actions = (
 	"prepare" => sub {
 		my $meson = "meson";
+		my $android_wrapper = "android-wrapper";
 
 		my $studio_dir = "/opt/android-studio/";
 		my $sdk;
@@ -291,6 +294,7 @@ my %actions = (
 			"sdk|s=s" => \$sdk,
 			"toolchain|t=s" => \$toolchain,
 			"meson=s" => \$meson,
+			"android-wrapper=s" => \$android_wrapper,
 			"release" => \$release,
 		) or usage("Incorrect usage of command line options");
 
@@ -299,6 +303,7 @@ my %actions = (
 		usage("Android SDK directory not specified") unless defined $sdk;
 
 		$meson = rel2abs($meson, $original_dir) if $meson =~ /^\.{1,2}\//;
+		$android_wrapper = rel2abs($android_wrapper, $original_dir) if $android_wrapper =~ /^\.{1,2}\//;
 		$studio_dir = rel2abs($studio_dir, $original_dir);
 		$sdk = rel2abs($sdk, $original_dir);
 		$toolchain = rel2abs($toolchain, $original_dir) if defined $toolchain;
@@ -317,7 +322,9 @@ my %actions = (
 
 		print "Generating toolchain crossfile\n" if $verbose;
 		my $tcc = Glib::KeyFile->new;
-		$tcc->set_string("constants", "toolchain", "'$toolchain/toolchains/llvm/prebuilt/linux-x86_64/'");
+		$tcc->set_string("constants", "ndkroot", "'$toolchain'");
+		$tcc->set_string("constants", "toolchain", "ndkroot / 'toolchains/llvm/prebuilt/linux-x86_64/'");
+		$tcc->set_string("constants", "android_wrapper", "'$android_wrapper'");
 		open my $tccfh, ">", "$pixiewood_dirname/toolchain.cross" or die("Failed to open toolchain crossfile for writing");
 		print $tccfh $tcc->to_data;
 		close $tccfh;
@@ -361,12 +368,17 @@ my %actions = (
 
 		print "Configuring build directories\n" if $verbose;
 		my $configures = ParallelRunner->new;
+		my $introspection = $appx->findvalue('/pw:app/pw:build/@introspection');
+		my %iv = ('' => 0, 'disabled' => 0, 'enabled' => 1, 'runtime' => 1);
+		die "Unknown introspection parameter: $introspection" unless exists $iv{$introspection};
+
 		my @options = map { $_->textContent } $appx->findnodes('//pw:app/pw:build/pw:configure-options/pw:option');
 		while (defined(my $arch = $arches->each)) {
 			my @cmd = ($meson, "setup",
 			           "--cross-file", "$pixiewood_dirname/toolchain.cross",
 			           "--cross-file", "$asset_dir/prepare/arch/$arch.cross",
 			           "--cross-file", "$asset_dir/prepare/android.cross",
+			           $iv{$introspection} ? ("--cross-file", "$asset_dir/prepare/introspection.cross") : (),
 			           "--buildtype", $release ? "release" : "debug",
 			           $release ? "--strip" : (),
 			           @options,
@@ -389,6 +401,7 @@ my %actions = (
 			my @args = ("--cross-file", rel2abs("$pixiewood_dirname/toolchain.cross"),
 			            "--cross-file", rel2abs("$asset_dir/prepare/arch/$arch.cross"),
 			            "--cross-file", rel2abs("$asset_dir/prepare/android.cross"),
+			            $iv{$introspection} ? ("--cross-file", "$asset_dir/prepare/introspection.cross") : (),
 			            @options);
 			# Escape commands with spaces in single quotes (and hope that they don't themselves contain single quotes)
 			# this should be replaced by Glib::shell_quote, but the Glib module seemingly doesn't provide functions
@@ -733,12 +746,14 @@ my %actions = (
 		}
 		die "Ninja build failed, see logs for more info" unless $builds->wait();
 
+		my $introspection = $appx->findvalue('/pw:app/pw:build/@introspection');
+
 		# Lets not run the install in parallel
 		while (defined(my $arch = $arches->each)) {
 			my @cmd = ($cfg->{'meson'}, "install",
 			           "-C", "$pixiewood_dirname/bin-$arch",
 			           "--destdir", rel2abs("$pixiewood_dirname/root"),
-			           "--tags", "runtime");
+			           "--tags", ($introspection eq "typelib") ? "runtime,typelib" : "runtime");
 			run \@cmd or die('Failed to install files');
 		}
 
@@ -762,6 +777,17 @@ my %actions = (
 			}
 		}
 		find { preprocess => \&pre_asset_copy, wanted => \&do_asset_copy, no_chdir => 1 }, $root;
+
+		if ($introspection eq "runtime") {
+			our $libdir = catfile $pixiewood_dirname, "root", "lib";
+			sub pre_typelib_copy {
+				# root directory contains subdirs for arches, always run
+				return @_ if $File::Find::dir eq $libdir;
+				return @_ if $File::Find::dir =~ /girepository-1\.0/;
+				grep { $_ eq "girepository-1.0" } @_
+			}
+			find { preprocess => \&pre_typelib_copy, wanted => \&do_asset_copy, no_chdir => 1 }, $libdir;
+		}
 
 		do {
 			my $root_schemas = catfile $pixiewood_dirname, "root", "share/glib-2.0/schemas";

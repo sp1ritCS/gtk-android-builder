@@ -1,0 +1,25 @@
+[binaries]
+exe_wrapper = [android_wrapper, '-t', ndkroot, '-s31', arch]
+ldd = [android_wrapper, '-t', ndkroot, '-s31', '--list', arch]
+
+[glib:project options]
+introspection = 'enabled'
+
+[harfbuzz:project options]
+introspection = 'enabled'
+
+[pango:project options]
+introspection = 'enabled'
+
+[graphene:project options]
+introspection = 'enabled'
+
+[gdk-pixbuf:project options]
+introspection = 'enabled'
+
+[gtk:project options]
+introspection = 'enabled'
+
+[libadwaita:project options]
+introspection = 'enabled'
+vapi = true
