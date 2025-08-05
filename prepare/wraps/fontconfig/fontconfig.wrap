@@ -3,7 +3,7 @@ directory = fontconfig
 url = https://gitlab.freedesktop.org/fontconfig/fontconfig.git
 push-url = git@gitlab.freedesktop.org:fontconfig/fontconfig.git
 depth = 1
-revision = 2.16.2
+revision = 2.17.1
 
 [provide]
 fontconfig = fontconfig_dep
