@@ -775,13 +775,6 @@ my %actions = (
 			}
 		};
 
-		do {
-			open my $fh, '>', catfile($asset_install_dir, "afpr") or die "Failed to create asset fingerprint file: $!";
-			binmode $fh;
-			print $fh map { pack("C", rand(256)) } 1..128; # file fingerprint with 128 random bytes
-			close $fh;
-		};
-
 		unless ($skip_gradle) {
 			my $gradle = fork;
 			die "fork failed: $!" unless defined $gradle;
