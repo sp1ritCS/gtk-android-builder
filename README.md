@@ -12,7 +12,7 @@ GTK Android Builder (codename pixiewood), is a tool designed to facilitate the p
 To build a GTK application for Android, it must meet the following preconditions:
 
 - Have an exposed `main(int, char**, char**)` entrypoint (reduced parameters are allowed) that ends up calling `g_application_run` before it returns
-- Ensure that the meson build script has set the `android_exe_type: 'application'` kwarg in the `executable` of the application target. As of now, this requires a [forked meson](https://github.com/sp1ritCS/meson/tree/android) (`git clone --depth 1 https://github.com/sp1ritCS/meson.git --branch android`).
+- Ensure that the meson build script has set the `android_exe_type: 'application'` kwarg in the `executable` of the application target. This needs meson version 1.9 or later.
 
 To then build the application, follow these steps:
 
