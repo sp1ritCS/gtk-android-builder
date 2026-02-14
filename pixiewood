@@ -24,7 +24,7 @@ use File::Basename qw(fileparse);
 use File::Copy qw(copy);
 use File::Find qw(find);
 use File::Path qw(make_path);
-use File::Spec::Functions qw(catfile rel2abs);
+use File::Spec::Functions qw(catfile rel2abs abs2rel);
 use Getopt::Long qw(GetOptions);
 use Glib;
 use Glib::Object::Introspection;
@@ -745,10 +745,9 @@ my %actions = (
 		our $asset_install_dir = "$pixiewood_dirname/android/app/src/main/assets/";
 
 		our $root = "$pixiewood_dirname/root";
-		our @filtered = ("bin", "lib", "share/glib-2.0/schemas");
+		our $filtered = Set::Scalar->new("bin", "lib", "share/glib-2.0/schemas");
 		sub pre_asset_copy {
-			my $pattern = join('|', map { quotemeta($_) } @filtered);
-			grep { catfile($File::Find::dir, $_) !~ /($pattern)$/ } @_
+			grep { not $filtered->contains(abs2rel(catfile($File::Find::dir, $_), $root)) } @_
 		}
 		sub do_asset_copy {
 			my $path = $File::Find::name;
