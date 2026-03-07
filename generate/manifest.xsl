@@ -23,13 +23,14 @@
 				android:roundIcon="@mipmap/ic_launcher_round"
 				android:supportsRtl="true"
 				android:theme="@style/Theme.Gtk"
-				android-tools:targetApi="35"
+				android-tools:targetApi="36"
 			>
 				<meta-data android:name="gtk.android.lib_name" android:value="{$libname}" />
 				<activity android:name="org.gtk.android.ToplevelActivity"
 					android:configChanges="density|orientation|screenLayout|screenSize|touchscreen|uiMode"
 					android:windowSoftInputMode="adjustResize"
 					android:launchMode="standard"
+					android:enableOnBackInvokedCallback="true"
 					android:resizeableActivity="true"
 					android:theme="@style/Theme.GtkSurface"
 					android:exported="true"
