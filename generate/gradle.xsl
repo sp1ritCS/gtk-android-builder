@@ -22,13 +22,15 @@ plugins {
 }
 
 android {
-    namespace '<xsl:value-of select="$package" />'
-    compileSdk 35
+    namespace = '<xsl:value-of select="$package" />'
+    compileSdk {
+        version = release(36)
+    }
 
     defaultConfig {
         applicationId "<xsl:value-of select="$package" />"
         minSdk 31
-	targetSdk 35
+        targetSdk 36
 <xsl:variable name="version" select="pw:vermax(//pw:metainfo//meta:component//meta:releases//meta:release//@version)" />
 <xsl:variable name="vercalc" select="pw:metainfo/@vercalc" />
 <xsl:choose>
@@ -44,7 +46,7 @@ android {
 </xsl:choose>
         versionName "<xsl:value-of select='$version'/>"
 
-        multiDexEnabled false
+        multiDexEnabled = false
 
         ndk {
             abiFilters <xsl:value-of select="$abis" />
@@ -59,16 +61,19 @@ android {
             minifyEnabled false
         }
     }
+
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
     }
+    enableKotlin = false
+
     splits {
         abi {
-            enable true
+            enable = true
             reset()
             include <xsl:value-of select="$abis" />
-            universalApk true
+            universalApk = true
         }
     }
 
