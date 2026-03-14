@@ -1,7 +1,7 @@
 [wrap-git]
 directory=libadwaita
 url=https://gitlab.gnome.org/GNOME/libadwaita.git
-revision=libadwaita-1-2
+revision=main
 depth=1
 
 [provide]
