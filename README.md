@@ -50,17 +50,10 @@ To then build the application, follow these steps:
 		</icon>
 	</style>
 	<dependencies>
-		<glib revison="2.80.0">
+		<glib>
 			<patch>hack</patch>
 		</glib>
-		<harfbuzz/>
 		<fontconfig/>
-		<rsvg revision="librsvg-2.40">
-			<patch>meson-for-gdkpixbuf</patch>
-		</rsvg>
-		<gdk-pixbuf>
-			<patch>rsvg</patch>
-		</gdk-pixbuf>
 		<gtk/>
 	</dependencies>
 	<build target="{the meson target name}">
@@ -90,7 +83,7 @@ Be aware that pixiewood ships and uses `Svg2Avd`, which requires `java` in PATH 
 
 #### Debian
 ```sh
-# apt-get install libglib-perl libglib-object-introspection-perl libipc-run-perl libjson-perl libset-scalar-perl libxml-libxml-perl libxml-libxslt-perl gir1.2-appstream openjdk-17-jre
+# apt-get install libglib-perl libglib-object-introspection-perl libipc-run-perl libjson-perl libset-scalar-perl libxml-libxml-perl libxml-libxslt-perl gir1.2-appstream openjdk-17-jdk
 # apt-get install build-essential glslc gobject-introspection libglib2.0-dev-bin libxml2-utils meson ninja-build sassc
 ```
 
