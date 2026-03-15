@@ -17,6 +17,10 @@
 	<xsl:template match="/pw:app">
 		<xsl:variable name="id" select="pw:metainfo/meta:component/meta:id[not(@xml:lang)]" />
 		<xsl:variable name="package" select="translate($id, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')"/>
+import groovy.io.FileType
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+
 plugins {
     alias(libs.plugins.android.application)
 }
@@ -28,7 +32,7 @@ android {
     defaultConfig {
         applicationId "<xsl:value-of select="$package" />"
         minSdk 31
-	targetSdk 35
+        targetSdk 35
 <xsl:variable name="version" select="pw:vermax(//pw:metainfo//meta:component//meta:releases//meta:release//@version)" />
 <xsl:variable name="vercalc" select="pw:metainfo/@vercalc" />
 <xsl:choose>
@@ -50,6 +54,49 @@ android {
             abiFilters <xsl:value-of select="$abis" />
         }
     }
+
+    def fingerprintAssetDir = layout.buildDirectory.dir("generated/fingerprint")
+    sourceSets.main.assets.srcDir(fingerprintAssetDir)
+    tasks.register('generateFingerprint') {
+        def assetsDir = layout.projectDirectory.dir("src/main/assets").asFile
+        doLast {
+            def assetsList = []
+            assetsDir.eachFileRecurse FileType.FILES, { File file ->
+                assetsList &lt;&lt; file
+            }
+            assetsList.sort { it.path }
+
+            def digest = MessageDigest.getInstance("SHA-512")
+            def buffer = new byte[4096]
+            assetsList.forEach { File file ->
+                def relPath = assetsDir.toPath().relativize(file.toPath())
+                digest.update(relPath.toString().getBytes(StandardCharsets.UTF_8))
+                file.withInputStream { InputStream stream ->
+                    int bytesRead
+                    while ((bytesRead = stream.read(buffer)) > 0) {
+                        digest.update(buffer, 0, bytesRead)
+                    }
+                }
+            }
+            def digestOut = digest.digest()
+
+            mkdir fingerprintAssetDir
+            def fingerprintBuffer = new byte[128]
+            // Historically, the fingerprint was 128 random bytes. As we use
+            // a SHA-512 hash here, we have 64 bytes left over that are just
+            // zeroed.
+            System.arraycopy(digestOut, 0, fingerprintBuffer, 0, Math.min(digestOut.length, fingerprintBuffer.length))
+            def fingerprintFile = fingerprintAssetDir.get().file("afpr").asFile
+            fingerprintFile.createNewFile()
+            fingerprintFile.bytes = fingerprintBuffer
+        }
+    }
+    applicationVariants.configureEach { variant ->
+        variant.getMergeAssetsProvider().configure { task ->
+            task.dependsOn(generateFingerprint)
+        }
+    }
+
 
     buildTypes {
         debug {
