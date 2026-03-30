@@ -26,6 +26,10 @@ sys_root = toolchain / 'sysroot/'
 [host_machine]
 system = 'android'
 
+[libffi:project options]
+doc = false
+tests = false
+
 [glib:built-in options]
 default_library = 'shared'
 
@@ -51,6 +55,9 @@ utilities = 'disabled'
 builtin_loaders = ['all']
 glycin = 'disabled'
 documentation = false
+man = false
+tests = false
+installed_tests = false
 
 [gtk:project options]
 android-backend = true
