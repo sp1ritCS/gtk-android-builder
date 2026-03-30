@@ -29,13 +29,28 @@ system = 'android'
 [cmake]
 ANDROID_ABI = abi
 
+[libffi:project options]
+doc = false
+tests = false
+
+[pcre2:project options]
+grep = false
+test = false
+
 [glib:built-in options]
 default_library = 'shared'
 
 [glib:project options]
 tests = false
-# I'd like to explicitly disable dtrace and systemtap, but glib recently moved them from booleans to options and meson can't cope with both 
+dtrace = 'disabled'
+systemtap = 'disabled'
 sysprof = 'disabled'
+
+[pixman:project options]
+gtk = 'disabled'
+libpng = 'disabled'
+tests = 'disabled'
+demos = 'disabled'
 
 [cairo:project options]
 tests = 'disabled'
@@ -50,10 +65,21 @@ introspection = 'disabled'
 docs = 'disabled'
 utilities = 'disabled'
 
+[fontconfig:project options]
+tests = 'disabled'
+tools = 'disabled'
+
+[pango:project options]
+build-testsuite = false
+build-examples = false
+
 [gdk-pixbuf:project options]
 builtin_loaders = ['all']
 glycin = 'disabled'
 documentation = false
+man = false
+tests = false
+installed_tests = false
 
 [gtk:project options]
 android-backend = true
