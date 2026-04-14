@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xsl:stylesheet
 	xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+	xmlns:str="http://exslt.org/strings"
 	xmlns:pw="https://sp1rit.arpa/pixiewood/"
 	xmlns:meta="https://specifications.freedesktop.org/metainfo/1.0"
 	version="1.0"
@@ -23,7 +24,7 @@
 	</xsl:template>
 
 	<xsl:template match="meta:name">
-		<string name="app_name"><xsl:value-of select="."/></string>
+		<string name="app_name"><xsl:value-of select="str:replace(., &quot;'&quot;, &quot;\'&quot;)" /></string>
 	</xsl:template>
 
 	<xsl:template match="*" priority='-1'/>
