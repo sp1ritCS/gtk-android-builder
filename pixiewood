@@ -280,7 +280,7 @@ my %actions = (
 	"prepare" => sub {
 		my $meson = "meson";
 
-		my $studio_dir = $ENV{ANDROID_STUDIO_DIR} or "/opt/android-studio/";
+		my $studio_dir = $ENV{ANDROID_STUDIO_DIR} || "/opt/android-studio/";
 		my $sdk = $ENV{ANDROID_HOME};
 		my $toolchain;
 
