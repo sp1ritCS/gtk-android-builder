@@ -99,4 +99,4 @@ There are four ways to "install" gtk-android-builder
 ## Special thanks
 
 I want to thank the GTK developers ([Matthias Clasen](mailto:mclasen@redhat.com) et al.) that have helped me [porting GTK to Android](https://gitlab.gnome.org/GNOME/gtk/-/merge_requests/7555)
-and [@theCapypara](https://github.com/theCapypara) for donating to me.
+and [@theCapypara](https://github.com/theCapypara) as well as [@zoeyAhmed](https://github.com/zoeyAhmed) for donating to me.
