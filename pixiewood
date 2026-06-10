@@ -583,9 +583,16 @@ my %actions = (
 						}
 						close $fh;
 					} elsif ($type eq "svg") {
-						$ENV{'STUDIO_DIR'} = $cfg->{'studio-dir'};
+						my @classpath = map { catfile $cfg->{'studio-dir'}, $_ } (
+							"lib/lib.jar",
+							"lib/util-8.jar",
+							"lib/module-intellij.libraries.guava.jar", "lib/intellij.libraries.guava.jar",
+							"plugins/android/lib/android-base-common.jar",
+							"plugins/android/lib/sdk-common.jar"
+						);
+						push @classpath, catfile($asset_dir, "generate");
 						my $path = path_from_uri $drawable->getAttribute("path") or die("Drawable is missing path");
-						my @cmd = (catfile("$asset_dir/generate", "Svg2Avd"), $path);
+						my @cmd = ("java", "-cp", join(":", @classpath), "Svg2Avd", $path);
 
 						my $scale = $drawable->getAttribute("scale");
 						if (defined $scale) {
