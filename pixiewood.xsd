@@ -137,6 +137,20 @@
 								</xs:documentation>
 							</xs:annotation>
 						</xs:attribute>
+						<xs:attribute name="introspection">
+							<xs:annotation>
+								<xs:documentation>
+									Specify if your target needs introspection to be generated. This can either just mean for
+									introspection to be available at build time (e.g. Vala) or if the target needs typelibs to be
+									available during runtime (e.g. Python)
+								</xs:documentation>
+							</xs:annotation>
+							<xs:simpleType>
+								<xs:restriction base="xs:string">
+									<xs:pattern value="disabled|enabled|runtime"/>
+								</xs:restriction>
+							</xs:simpleType>
+						</xs:attribute>
 					</xs:complexType>
 				</xs:element>
 			</xs:all>
