@@ -71,3 +71,10 @@ vapi = false
 gtk_doc = false
 tests = false
 examples = false
+
+[granite:built-in options]
+default_library = 'shared'
+
+[granite:project options]
+introspection = false
+demo = false
