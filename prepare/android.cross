@@ -1,9 +1,9 @@
 [constants]
-common_flags = []
+common_flags = ['-D__ANDROID_UNAVAILABLE_SYMBOLS_ARE_WEAK__']
 
 [binaries]
-c          = toolchain / 'bin' / arch+'-linux-'+platform+'31-clang'
-cpp        = toolchain / 'bin' / arch+'-linux-'+platform+'31-clang++'
+c          = toolchain / 'bin' / arch+'-linux-'+platform+'26-clang'
+cpp        = toolchain / 'bin' / arch+'-linux-'+platform+'26-clang++'
 ar         = toolchain / 'bin/llvm-ar'
 as         = toolchain / 'bin/llvm-as'
 ranlib     = toolchain / 'bin/llvm-ranlib'

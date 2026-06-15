@@ -29,7 +29,7 @@ android {
 
     defaultConfig {
         applicationId "<xsl:value-of select="$package" />"
-        minSdk 31
+        minSdk 26
         targetSdk 36
 <xsl:variable name="version" select="pw:vermax(//pw:metainfo//meta:component//meta:releases//meta:release//@version)" />
 <xsl:variable name="vercalc" select="pw:metainfo/@vercalc" />
