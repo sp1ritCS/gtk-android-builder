@@ -318,6 +318,8 @@ my %actions = (
 		print "Generating toolchain crossfile\n" if $verbose;
 		my $tcc = Glib::KeyFile->new;
 		$tcc->set_string("constants", "toolchain", "'$toolchain/toolchains/llvm/prebuilt/linux-x86_64/'");
+		$tcc->set_string("binaries", "cmake", "'cmake'");
+		$tcc->set_string("properties", "cmake_toolchain_file", "'$toolchain/build/cmake/android.toolchain.cmake'");
 		open my $tccfh, ">", "$pixiewood_dirname/toolchain.cross" or die("Failed to open toolchain crossfile for writing");
 		print $tccfh $tcc->to_data;
 		close $tccfh;

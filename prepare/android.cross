@@ -26,6 +26,9 @@ sys_root = toolchain / 'sysroot/'
 [host_machine]
 system = 'android'
 
+[cmake]
+ANDROID_ABI = abi
+
 [glib:built-in options]
 default_library = 'shared'
 
