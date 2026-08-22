@@ -1,0 +1,23 @@
+diff --git a/src/gtk-4.0/meson.build b/src/gtk-4.0/meson.build
+index a381884..9baec00 100644
+--- a/src/gtk-4.0/meson.build
++++ b/src/gtk-4.0/meson.build
+@@ -41,15 +41,15 @@ foreach variant : variants
+ 
+     meson.add_install_script (install_exec,
+         variant_target.full_path(),
+-        dest_theme_dir / 'gtk-4.0' / 'gtk.css'
++        dest_theme_dir / 'gtk-4.0' / 'gtk.css', install_tag: 'runtime'
+     )
+ 
+     meson.add_install_script (install_exec,
+         variant_dark_target.full_path(),
+-        dest_theme_dir / 'gtk-4.0' / 'gtk-dark.css'
++        dest_theme_dir / 'gtk-4.0' / 'gtk-dark.css', install_tag: 'runtime'
+     )
+ 
+     install_subdir([
+         'assets',
+-    ], install_dir: dest_theme_dir / 'gtk-4.0' )
++    ], install_dir: dest_theme_dir / 'gtk-4.0', install_tag: 'runtime')
+ endforeach
