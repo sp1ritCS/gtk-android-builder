@@ -24,10 +24,12 @@ use File::Basename qw(fileparse);
 use File::Copy qw(copy);
 use File::Find qw(find);
 use File::Path qw(make_path);
+use File::Spec;
 use File::Spec::Functions qw(catfile rel2abs abs2rel);
 use Getopt::Long qw(GetOptions);
 use Glib;
 use Glib::Object::Introspection;
+use IPC::Open3;
 use IPC::Run qw(run);
 use JSON;
 use List::Util qw(max reduce);
@@ -122,15 +124,29 @@ sub path_from_uri {
 		return catfile ".", $path;
 	} elsif ($dir eq "build") {
 		my ($arch,$path) = $path =~ m/^\/*([a-z0-9_]*)\/(.*)$/;
-		my $res = catfile ".", $pixiewood_dirname, "bin-$arch", $path;
-		do {
-			# Run build:// URL as target in case it is generated during build
-			my @cmd = ($ninja,
-			           "-C", "$pixiewood_dirname/bin-$arch",
-			           "$path");
-			run \@cmd, '>', "/dev/null", '2>&1';
-		} if -e catfile ".", $pixiewood_dirname, "bin-$arch", "build.ninja";
-		return $res;
+
+		# Check if path is a build target
+		my @tgccmd = ($ninja,
+			      "-C", "$pixiewood_dirname/bin-$arch",
+			      "-t", "targets", "all");
+
+		open my $nulldev, '>', File::Spec->devnull;
+		my $h = open3(undef, my $tgtlst, $nulldev, @tgccmd);
+
+		my $is_target = 0;
+		while (my $tgt = <$tgtlst>) {
+			($is_target = 1, last) if $tgt =~ /^\Q$path\E: .*/;
+		}
+
+		kill 'TERM', $h if $is_target;
+		waitpid $h, 0;
+
+		my @cmd = ($ninja,
+		           "-C", "$pixiewood_dirname/bin-$arch",
+		           "$path");
+		run \@cmd if $is_target;
+
+		return catfile ".", $pixiewood_dirname, "bin-$arch", $path;
 	}
 	return $path;
 };
