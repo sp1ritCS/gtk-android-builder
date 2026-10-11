@@ -1,0 +1,11 @@
+diff --git a/meson.build b/meson.build
+index 004caaee..fbb7317d 100644
+--- a/meson.build
++++ b/meson.build
+@@ -77,5 +77,5 @@ if get_option('demo')
+ endif
+ 
+ gnome.post_install(
+-    gtk_update_icon_cache: true
++    gtk_update_icon_cache: false
+ )
