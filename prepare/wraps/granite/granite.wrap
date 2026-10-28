@@ -1,0 +1,8 @@
+[wrap-git]
+directory=granite
+url=https://github.com/elementary/granite.git
+revision=7.8.1
+depth=1
+
+[provide]
+granite-7 = libgranite_dep

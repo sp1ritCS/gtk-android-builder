@@ -1,0 +1,5 @@
+[wrap-git]
+directory=granite-stylesheet
+url=https://github.com/elementary/stylesheet.git
+revision=main
+depth=1
